@@ -2,10 +2,9 @@
 import streamlit as st
 import json
 import os
+import html
 from typing import List, Optional, Tuple, Any
 from streamlit_lottie import st_lottie
-import html
-
 
 # --------------------------
 #     PAGE CONFIG
@@ -13,7 +12,7 @@ import html
 st.set_page_config(page_title="Marcos Ondruska — Portfolio", page_icon="🎾", layout="wide")
 
 # --------------------------
-#     YOUR LINKS
+#     LINKS / CONTACT
 # --------------------------
 LINKEDIN_URL = "https://www.linkedin.com/in/marcos-ondruska-3b3a749/"
 GITHUB_URL   = "https://github.com/"                      # <- set your GitHub profile if you want
@@ -104,7 +103,6 @@ st.markdown("""
     .pill:hover { background: var(--pill-hover); border-color: var(--brand-gold); transform: translateY(-1px); }
     .pill:focus-visible { box-shadow: 0 0 0 3px rgba(255,215,0,0.35); }
 
-    /* Subtle caption under Lottie */
     .cap { color: #CFE2FF; font-size: 12px; margin-top: -10px; }
     </style>
 """, unsafe_allow_html=True)
@@ -194,24 +192,18 @@ with right:
             st.caption(f"<span class='cap'>Animation: {os.path.basename(lottie_used)}</span>", unsafe_allow_html=True)
 
 # --------------------------
-#     ABOUT ME (updated)
+#     ABOUT ME (refactored)
 # --------------------------
+about_me = """
+I’m a developer with a unique path: from competing as a professional athlete to building software that powers real-world decisions. Today, I focus on creating intelligent, data-driven applications — from algorithmic trading systems to interactive AI tools.
+
+My technical toolkit spans Python, Java, JavaScript, C, F#, and Prolog, with experience across both enterprise frameworks (Spring Boot) and modern full-stack stacks (Node.js, React, MongoDB). I’m fluent in PostgreSQL and MongoDB, and enjoy working at the intersection of quantitative finance, AI/ML, and software engineering.
+
+Beyond code, I bring a global perspective — fluent in English, Afrikaans, German, and Slovak — and thrive in environments where technology, strategy, and creativity converge.
+"""
+
 st.markdown("<div class='section-header'>About Me</div>", unsafe_allow_html=True)
-st.markdown("""
-<div class="card">
-<p class="muted">
-I’m a <b>creative developer and former professional athlete</b> with a passion for building tools that solve real-world problems — from <b>algorithmic trading systems</b> to <b>interactive AI applications</b>.
-</p>
-<p class="muted" style="margin-bottom:0;">
-My background blends <b>software engineering</b> and <b>quantitative finance</b>: I work with
-<b>Python, Java, JavaScript, C, F#, and Prolog</b>, and have experience across full-stack and enterprise frameworks like
-<b>NERM</b> (Node.js, Express, React, MongoDB) and <b>Spring Boot</b>. I’m proficient with both <b>PostgreSQL</b> and <b>MongoDB</b>,
-which gives me flexibility for data-driven applications. Specialties include <b>algorithmic & quantitative trading</b>, <b>AI/ML</b>,
-and <b>capital markets</b>, with a foundation in <b>networking & systems</b> (Net-Centric Computing, Wireshark, administration).
-Beyond technology, I bring a <b>global perspective</b> — I speak <b>English, Afrikaans, German, and Slovak</b> fluently.
-</p>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(f"<div class='card'><p class='muted'>{about_me.replace(chr(10), '<br/><br/>')}</p></div>", unsafe_allow_html=True)
 
 # --------------------------
 #     TENNIS COACHING
@@ -266,11 +258,10 @@ Generate balanced round-robin schedules for 2–20 players with multiple scoring
     st.link_button("Open App", ROUND_ROBIN_APP, use_container_width=False)
 
 # --------------------------
-#     SKILLS — TAG CLOUD / BADGE WALL (Option A)
+#     SKILLS — TAG CLOUD / BADGE WALL
 # --------------------------
 st.markdown("<div class='section-header'>Skills</div>", unsafe_allow_html=True)
 
-# Curated, most relevant badges (edit this list to add/remove)
 SKILLS: List[str] = [
     # Core programming
     "Python", "Java", "JavaScript", "C", "F#", "Prolog",
@@ -288,12 +279,10 @@ SKILLS: List[str] = [
     "Team Leadership", "Coaching/Mentorship", "English", "Afrikaans", "German", "Slovak",
 ]
 
-# Render as pill wall
 pills_html = "<div class='card'><div class='pill-wall'>" + "".join(
     f"<span class='pill' tabindex='0'>{html.escape(s)}</span>" for s in SKILLS
 ) + "</div></div>"
 st.markdown(pills_html, unsafe_allow_html=True)
-
 
 # --------------------------
 #     CONNECT
