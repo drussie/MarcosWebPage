@@ -189,7 +189,7 @@ with col2:
 st.markdown("### Available Apps")
 apps = {
     "Round Robin Tennis": "apps/round_robin.html",  # relative to project root (one level up from pages/)
-    "Mortgage Calculator": "apps/mortgage_calculator.html",
+    "App 2": "https://example.com/app2",
     "App 3": "https://example.com/app3"
 }
 selected_app = st.selectbox("Select an app to run", list(apps.keys()))
