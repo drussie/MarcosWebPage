@@ -11,14 +11,12 @@ from streamlit_lottie import st_lottie
 st.set_page_config(page_title="Marcos Ondruska — Portfolio", page_icon="🎾", layout="wide")
 
 # --------------------------
-#     CONFIGURE YOUR LINKS
+#     YOUR LINKS
 # --------------------------
 LINKEDIN_URL = "https://www.linkedin.com/in/marcos-ondruska-3b3a749/"
-GITHUB_URL   = "https://github.com/"            # <- put your GitHub username here
-X_URL        = "https://x.com/"                 # <- put your X/Twitter handle here
-EMAIL        = ""                               # <- optional, e.g. "hello@marcosondruska.com"
-
-# Optional: Quick links to live apps
+GITHUB_URL   = "https://github.com/"                      # <- set your GitHub profile if you want
+X_URL        = "https://x.com/"                           # <- set your X/Twitter handle if you want
+EMAIL        = "marcosondruska@gmail.com"                 # <- provided
 ROUND_ROBIN_APP = "https://marcoswebpage-k3rbpwxme7nzgk5rwdee3c.streamlit.app/"
 
 # --------------------------
@@ -35,6 +33,9 @@ st.markdown("""
     }
     .stApp { background: linear-gradient(135deg, var(--brand-bg1), var(--brand-bg2)); color: white; }
 
+    /* Layout container: center + max width for polish */
+    .block-container { max-width: 1100px; padding-top: 1rem; padding-bottom: 2rem; margin: 0 auto; }
+
     /* Headings */
     h1,h2,h3,.section-header {
       font-family: 'Orbitron', sans-serif;
@@ -45,9 +46,7 @@ st.markdown("""
     .hero-sub   { color: #E6F0FF; font-family: 'Inter', sans-serif; font-size: 18px; margin-bottom: 16px; }
 
     /* Buttons/links */
-    a, .stButton>button {
-      transition: all .2s ease;
-    }
+    a, .stButton>button { transition: all .2s ease; }
     a { color: var(--brand-mint) !important; text-decoration: none; }
     a:hover { color: var(--brand-gold) !important; text-decoration: underline; }
 
@@ -77,9 +76,6 @@ st.markdown("""
 
     .stExpander { transition: transform .2s ease; }
     .stExpander:hover { transform: translateY(-2px); }
-
-    /* Tighten default Streamlit paddings a bit */
-    .block-container { padding-top: 1rem; padding-bottom: 2rem; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -119,14 +115,11 @@ def _load_lottie_candidates(cands: List[str]) -> Tuple[Optional[Any], Optional[s
     return None, None
 
 def load_lottie_prefer_local(name_or_abs_path: str) -> Tuple[Optional[Any], Optional[str]]:
-    # If absolute/relative path provided, try variants
     if name_or_abs_path:
         abs_norm = _normalize_abs(name_or_abs_path)
         data, used = _load_lottie_candidates(_fix_json_extension(abs_norm))
         if data is not None:
             return data, used
-
-    # Otherwise, try local filenames near app root
     here = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(here)
     search_bases = [
@@ -140,30 +133,30 @@ def load_lottie_prefer_local(name_or_abs_path: str) -> Tuple[Optional[Any], Opti
         candidates.extend(_fix_json_extension(base))
     return _load_lottie_candidates(candidates)
 
+# Try to load a tennis-themed Lottie (adjust path name if needed)
+lottie_data, lottie_used = load_lottie_prefer_local("Tennis Ball")
+
 # --------------------------
 #     HEADER / HERO
 # --------------------------
-# Try to load a tennis-themed Lottie (adjust path if needed)
-lottie_data, lottie_used = load_lottie_prefer_local("Tennis Ball")
-
 left, right = st.columns([3, 1])
 with left:
     st.markdown("<h1 class='hero-title'>Marcos Ondruska</h1>", unsafe_allow_html=True)
     st.markdown(
         "<div class='hero-sub'>Ex-ATP #27 • Olympian (Atlanta 1996) • Former South Africa Davis Cup Captain • "
-        "GPTCA A* Certified Coach • Software Developer (CS, ML/AI & Trading Systems)</div>",
+        "GPTCA A* Certified Coach • Software Developer (ML/Trading)</div>",
         unsafe_allow_html=True
     )
-    # Quick action buttons
+    # Quick action buttons (no Round Robin header link here)
     btn_cols = st.columns([1,1,1,1])
     with btn_cols[0]:
         st.link_button("🔗 LinkedIn", LINKEDIN_URL, use_container_width=True)
     with btn_cols[1]:
-        st.link_button("🎾 Round Robin App", ROUND_ROBIN_APP, use_container_width=True)
-    with btn_cols[2]:
         st.link_button("💻 GitHub", GITHUB_URL or "https://github.com/", use_container_width=True)
-    with btn_cols[3]:
+    with btn_cols[2]:
         st.link_button("𝕏 Profile", X_URL or "https://x.com/", use_container_width=True)
+    with btn_cols[3]:
+        st.link_button("✉️ Email", f"mailto:{EMAIL}", use_container_width=True)
 
 with right:
     if lottie_data:
@@ -172,93 +165,76 @@ with right:
             st.caption(f"Animation: `{os.path.basename(lottie_used)}`")
 
 # --------------------------
-#     SNAPSHOT / ABOUT
+#     TENNIS COACHING
 # --------------------------
-st.markdown("<div class='section-header'>Snapshot</div>", unsafe_allow_html=True)
+st.markdown("<div class='section-header'>Tennis Coaching</div>", unsafe_allow_html=True)
 st.markdown("""
 <div class="card">
-<ul class="muted">
-  <li><b>ATP Career-High Singles:</b> #27 • <b>Miami Open</b> semifinalist</li>
-  <li><b>Olympian (1996, Atlanta):</b> defeated Goran Ivanišević</li>
-  <li><b>Davis Cup Captain (South Africa):</b> led promotion from Euro/Africa Group 4 → Group 1</li>
-  <li><b>GPTCA A* Certified Coach:</b> ATP-certified professional coaching designation</li>
-  <li><b>Coached:</b> Vincent Spadea (former ATP #40), supported Jennifer Capriati during 2004 US Open SF run</li>
-  <li><b>Software & Data:</b> Python, Streamlit, ib_insync, yfinance, ML/AI (RL/Transformers), PostgreSQL</li>
-  <li><b>Current Focus:</b> Building trading systems, computer vision for tennis analytics, and web apps</li>
+<p class="muted">
+I bring over 30 years of professional tennis experience to the court — from competing at the highest level (Olympics, ATP Tour, Davis Cup) to coaching players at all levels. My focus is on player development, mindset, and performance strategies that translate into real results.
+</p>
+<ul class="muted" style="margin-bottom: 0;">
+  <li><b>Private Lessons</b> — 1-on-1 coaching tailored to your game</li>
+  <li><b>Group Clinics & Camps</b> — competitive learning environments</li>
+  <li><b>Performance Consulting</b> — match strategy, mental prep, and video analysis</li>
+  <li><b>Junior Development</b> — long-term growth plans for young athletes</li>
 </ul>
 </div>
 """, unsafe_allow_html=True)
 
-# --------------------------
-#     FEATURED PROJECTS
-# --------------------------
-st.markdown("<div class='section-header'>Featured Projects</div>", unsafe_allow_html=True)
+tc_cols = st.columns([1,1,1])
+with tc_cols[0]:
+    st.link_button("Request a Session", f"mailto:{EMAIL}?subject=Tennis%20Coaching%20Inquiry", use_container_width=True)
+with tc_cols[1]:
+    st.link_button("View LinkedIn", LINKEDIN_URL, use_container_width=True)
+with tc_cols[2]:
+    st.link_button("Contact by Email", f"mailto:{EMAIL}", use_container_width=True)
 
-# Project 1: Round Robin App
-with st.expander("🎾 Round Robin Tennis Scheduler (Streamlit)", expanded=True):
+# --------------------------
+#     SOFTWARE & DATA PROJECTS
+# --------------------------
+st.markdown("<div class='section-header'>Software & Data Projects</div>", unsafe_allow_html=True)
+
+with st.expander("📈 Intraday Trading Engine (IB + Python)", expanded=True):
     st.markdown("""
-- Create round-robin schedules for 2–20 players
-- Dynamic UI with auto-sizing "card" container and robust button handling
-- Points/Games/Best-of formats, standings, and results entry
+Automated equity strategy using Interactive Brokers (ib_insync), ATR initial stops, EMA trailing stops, Telegram alerts, and PostgreSQL logging. Includes RVOL scanner, premarket breakout logic, and daily diagnostics.
+""")
+
+with st.expander("🧭 Market Breadth Dashboard"):
+    st.markdown("""
+Real-time advances/declines, highs/lows, and up/down volume for macro trading signals, with fallbacks and caching to handle broker data gaps.
+""")
+
+with st.expander("🎥 Tennis Video Analytics (YOLOv11x, Homography, Flask)"):
+    st.markdown("""
+Ball & player tracking, court calibration/homography, rally segmentation, bounce detection, and heatmaps with video overlay.
+""")
+
+with st.expander("🎾 Round Robin Tournament App (Streamlit)"):
+    st.markdown("""
+Generate balanced round-robin schedules for 2–20 players with multiple scoring formats, live standings, and results entry. Designed with an auto-sizing UI container for a clean embed.
 """)
     st.link_button("Open App", ROUND_ROBIN_APP, use_container_width=False)
 
-# Project 2: Trading Systems
-with st.expander("📈 Intraday Trading System (IB + Python)"):
-    st.markdown("""
-- ib_insync live trading scripts: ATR initial stops, EMA trailing stops, Telegram alerts
-- RVOL scanner, premarket breakout logic, and account/risk controls
-- Postgres PnL tracking, daily diagnostics, and robust error handling
-""")
-    if GITHUB_URL:
-        st.markdown(f"[View GitHub]({GITHUB_URL})")
-
-# Project 3: Tennis Video Analytics
-with st.expander("🎥 Tennis Analytics (YOLOv11x, Homography, Flask)"):
-    st.markdown("""
-- Ball & player tracking, court calibration/homography
-- Rally segmentation and bounce detection visualization
-- Multithreaded processing, PostgreSQL storage, and heatmaps
-""")
-
-# Project 4: ML/LLM Learning & Tools
-with st.expander("🧠 ML/LLM Learning & Tools"):
-    st.markdown("""
-- Deep learning coursework (Fall 2025) with a focus on Transformers and explainability (SHAP)
-- Building tokenizers and experimenting with small LLMs locally (Apple M3)
-""")
-
-# --------------------------
-#     EXPERIENCE HIGHLIGHTS
-# --------------------------
-st.markdown("<div class='section-header'>Experience Highlights</div>", unsafe_allow_html=True)
 st.markdown("""
-<div class="card">
-<b>Tennis Professional & Coach</b><br/>
-GPTCA A* Certified • Ex-ATP Top 30 • Olympian • Davis Cup Captain<br/>
-<i>Player Development · High-Performance Coaching · Program Leadership</i>
-</div>
-<div class="card">
-<b>Software Developer (Python)</b><br/>
-Algorithmic Trading · Data Engineering · Web Apps (Streamlit) · Computer Vision (YOLO)<br/>
-<i>ib_insync · yfinance · PostgreSQL · Flask · RL/Transformers · Visualization</i>
+<div class="card" style="margin-top:8px;">
+<b>Skills:</b> Python · Streamlit · ib_insync · PostgreSQL · Reinforcement Learning · YOLO · Transformers · Data Visualization
 </div>
 """, unsafe_allow_html=True)
 
 # --------------------------
-#     LINKS
+#     CONNECT
 # --------------------------
 st.markdown("<div class='section-header'>Connect</div>", unsafe_allow_html=True)
-lc1, lc2, lc3 = st.columns(3)
+lc1, lc2, lc3, lc4 = st.columns(4)
 with lc1:
     st.markdown(f"[LinkedIn]({LINKEDIN_URL})")
 with lc2:
     st.markdown(f"[GitHub]({GITHUB_URL or 'https://github.com/'})")
 with lc3:
     st.markdown(f"[X (Twitter)]({X_URL or 'https://x.com/'})")
-
-if EMAIL:
-    st.markdown(f"<p class='muted'>Email: <a href='mailto:{EMAIL}'>{EMAIL}</a></p>", unsafe_allow_html=True)
+with lc4:
+    st.markdown(f"[Email](mailto:{EMAIL})")
 
 # --------------------------
 #     FOOTER
