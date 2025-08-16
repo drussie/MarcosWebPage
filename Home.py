@@ -30,6 +30,10 @@ st.markdown("""
         --brand-mint: #00FF7F;
         --brand-bg1: #0A2540;
         --brand-bg2: #1E90FF;
+        --pill-bg: rgba(255,255,255,0.10);
+        --pill-brd: rgba(255,255,255,0.28);
+        --pill-txt: #EAF2FF;
+        --pill-hover: rgba(255,215,0,0.20);
     }
     .stApp { background: linear-gradient(135deg, var(--brand-bg1), var(--brand-bg2)); color: white; }
     .block-container { max-width: 1100px; padding-top: 1rem; padding-bottom: 2rem; margin: 0 auto; }
@@ -71,6 +75,35 @@ st.markdown("""
 
     .stExpander { transition: transform .2s ease; }
     .stExpander:hover { transform: translateY(-2px); }
+
+    /* --- Pill (badge wall) styles --- */
+    .pill-wall {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 10px;
+      align-items: center;
+      margin-top: 6px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--pill-bg);
+      color: var(--pill-txt);
+      border: 1px solid var(--pill-brd);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      line-height: 1;
+      text-decoration: none;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+      outline: none;
+    }
+    .pill:hover { background: var(--pill-hover); border-color: var(--brand-gold); transform: translateY(-1px); }
+    .pill:focus-visible { box-shadow: 0 0 0 3px rgba(255,215,0,0.35); }
+
+    /* Subtle caption under Lottie */
+    .cap { color: #CFE2FF; font-size: 12px; margin-top: -10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -156,7 +189,7 @@ with right:
     if lottie_data:
         st_lottie(lottie_data, height=200, key="hero_anim")
         if lottie_used:
-            st.caption(f"Animation: `{os.path.basename(lottie_used)}`")
+            st.caption(f"<span class='cap'>Animation: {os.path.basename(lottie_used)}</span>", unsafe_allow_html=True)
 
 # --------------------------
 #     ABOUT ME (updated)
@@ -231,24 +264,33 @@ Generate balanced round-robin schedules for 2–20 players with multiple scoring
     st.link_button("Open App", ROUND_ROBIN_APP, use_container_width=False)
 
 # --------------------------
-#     SKILLS SNAPSHOT
+#     SKILLS — TAG CLOUD / BADGE WALL (Option A)
 # --------------------------
-st.markdown("<div class='section-header'>Skills Snapshot</div>", unsafe_allow_html=True)
-st.markdown("""
-<div class="card">
-<b>Programming Languages</b><br/>
-Python · Java · JavaScript · C · F# · Prolog
-<br/><br/>
-<b>Frameworks & Tech Stacks</b><br/>
-NERM (Node.js, Express, React, MongoDB) · Spring Boot
-<br/><br/>
-<b>Databases</b><br/>
-PostgreSQL · MongoDB
-<br/><br/>
-<b>Specializations</b><br/>
-Algorithmic & Quantitative Trading · Artificial Intelligence / Machine Learning · Capital Markets & Equities · Networking & Systems
-</div>
-""", unsafe_allow_html=True)
+st.markdown("<div class='section-header'>Skills</div>", unsafe_allow_html=True)
+
+# Curated, most relevant badges (edit this list to add/remove)
+SKILLS: List[str] = [
+    # Core programming
+    "Python", "Java", "JavaScript", "C", "F#", "Prolog",
+    # Frameworks & tools
+    "Spring Boot", "Node.js", "Express", "React", "Docker", "JUnit", "GitHub",
+    # Databases
+    "PostgreSQL", "MongoDB", "SQL",
+    # Web & CS
+    "REST APIs", "OOP", "Data Structures & Algorithms", "Systems Programming", "Networking", "Linux",
+    # Specializations
+    "Algorithmic Trading", "Quantitative Investing", "AI/ML", "Capital Markets",
+    # Practices
+    "Unit Testing", "Version Control", "Scrum",
+    # Leadership & Languages
+    "Team Leadership", "Coaching/Mentorship", "English", "Afrikaans", "German", "Slovak",
+]
+
+# Render as pill wall
+pills_html = "<div class='card'><div class='pill-wall'>" + "".join(
+    f"<span class='pill' tabindex='0'>{st.escape_markdown(s)}</span>" for s in SKILLS
+) + "</div></div>"
+st.markdown(pills_html, unsafe_allow_html=True)
 
 # --------------------------
 #     CONNECT
