@@ -5,6 +5,7 @@ import os
 import html
 from typing import List, Optional, Tuple, Any
 from streamlit_lottie import st_lottie
+from urllib.parse import quote  # <-- added
 
 # --------------------------
 #     PAGE CONFIG
@@ -15,8 +16,8 @@ st.set_page_config(page_title="Marcos Ondruska — Portfolio", page_icon="🎾",
 #     LINKS / CONTACT
 # --------------------------
 LINKEDIN_URL = "https://www.linkedin.com/in/marcos-ondruska-3b3a749/"
-GITHUB_URL   = "https://github.com/drussie"                      # <- set your GitHub profile if you want
-X_URL        = "https://x.com/drussie"                           # <- set your X/Twitter handle if you want
+GITHUB_URL   = "https://github.com/drussie"
+X_URL        = "https://x.com/drussie"
 EMAIL        = "marcosondruska@gmail.com"
 ROUND_ROBIN_APP = "https://marcoswebpage-k3rbpwxme7nzgk5rwdee3c.streamlit.app/"
 
@@ -61,6 +62,21 @@ st.markdown("""
     }
     .btn-row .stButton>button:hover { transform: translateY(-1px); border-color: var(--brand-gold); }
 
+    /* Button-styled anchor for mailto */
+    .btn-like {
+      display: inline-block;
+      background: rgba(255,255,255,0.1);
+      color: white !important;
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 10px 16px;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.2);
+      text-decoration: none !important;
+      text-align: center;
+      width: 100%;
+    }
+    .btn-like:hover { transform: translateY(-1px); border-color: var(--brand-gold); }
+
     .card {
       background: rgba(255,255,255,0.07);
       border: 1px solid rgba(255,255,255,0.18);
@@ -76,15 +92,15 @@ st.markdown("""
 
     /* Make JUST the About Me header smaller + tighter spacing */
     .section-header.about { 
-      font-size: 20px;            /* smaller than default 26px */
-      margin: 4px 0 6px;          /* tighter spacing */
+      font-size: 20px;
+      margin: 4px 0 6px;
     }
     .about-card { 
-      padding: 14px 16px;         /* slightly tighter padding */
+      padding: 14px 16px;
     }
     .about-card p { 
-      margin: 0 0 8px;            /* reduce paragraph gaps */
-      line-height: 1.35;          /* tighter line height */
+      margin: 0 0 8px;
+      line-height: 1.35;
     }
 
     .stExpander { transition: transform .2s ease; }
@@ -128,7 +144,7 @@ def _fix_json_extension(p: str) -> List[str]:
     low = p.lower()
     if low.endswith(".json.json"):
         candidates.append(p)
-        candidates.append(p[:-5])   # drop one ".json"
+        candidates.append(p[:-5])
     elif low.endswith(".json"):
         candidates.append(p)
         candidates.append(p + ".json")
@@ -178,6 +194,27 @@ def load_lottie_prefer_local(name_or_abs_path: str) -> Tuple[Optional[Any], Opti
 lottie_data, lottie_used = load_lottie_prefer_local("Tennis Ball")
 
 # --------------------------
+#     MAILTO HELPER
+# --------------------------
+def mailto_link(email: str, label: str, subject: str = "", body: str = "", full_width: bool = True) -> None:
+    """
+    Renders a button-styled anchor that opens the user's default mail client
+    without spawning a blank new tab (works better than st.link_button for mailto).
+    """
+    params = []
+    if subject:
+        params.append(f"subject={quote(subject)}")
+    if body:
+        params.append(f"body={quote(body)}")
+    qs = ("?" + "&".join(params)) if params else ""
+    href = f"mailto:{email}{qs}"
+    width_style = "style='width:100%; display:inline-block;'" if full_width else ""
+    st.markdown(
+        f"<a class='btn-like' href='{href}' {width_style} rel='noopener'>{html.escape(label)}</a>",
+        unsafe_allow_html=True
+    )
+
+# --------------------------
 #     HEADER / HERO
 # --------------------------
 left, right = st.columns([3, 1])
@@ -196,7 +233,8 @@ with left:
     with btn_cols[2]:
         st.link_button("𝕏 Profile", X_URL or "https://x.com/", use_container_width=True)
     with btn_cols[3]:
-        st.link_button("✉️ Email", f"mailto:{EMAIL}", use_container_width=True)
+        # Replaced st.link_button for email with a mailto anchor
+        mailto_link(EMAIL, "✉️ Email", subject="Hello Marcos", body="Hi Marcos,", full_width=True)
 
 with right:
     if lottie_data:
@@ -234,11 +272,11 @@ st.markdown("""
 
 tc_cols = st.columns([1,1,1])
 with tc_cols[0]:
-    st.link_button("Request a Session", f"mailto:{EMAIL}?subject=Tennis%20Coaching%20Inquiry", use_container_width=True)
+    mailto_link(EMAIL, "Request a Session", subject="Tennis Coaching Inquiry", body="Hi Marcos,\n\nI'd like to schedule a session.")
 with tc_cols[1]:
     st.link_button("View LinkedIn", LINKEDIN_URL, use_container_width=True)
 with tc_cols[2]:
-    st.link_button("Contact by Email", f"mailto:{EMAIL}", use_container_width=True)
+    mailto_link(EMAIL, "Contact by Email", subject="General Inquiry", body="Hi Marcos,")
 
 # --------------------------
 #     SOFTWARE & DATA PROJECTS
@@ -305,7 +343,8 @@ with lc2:
 with lc3:
     st.markdown(f"[X (Twitter)]({X_URL or 'https://x.com/'})")
 with lc4:
-    st.markdown(f"[Email](mailto:{EMAIL})")
+    # Use the same button-styled anchor for consistency (small, not full width here)
+    mailto_link(EMAIL, "Email", subject="Hello Marcos", body="Hi Marcos,", full_width=False)
 
 # --------------------------
 #     FOOTER
