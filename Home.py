@@ -194,13 +194,15 @@ with right:
 # --------------------------
 #     ABOUT ME (refactored)
 # --------------------------
-about_me = """
-I’m a developer with a unique path: from competing as a professional athlete to building software that powers real-world decisions. Today, I focus on creating intelligent, data-driven applications — from algorithmic trading systems to interactive AI tools.
+st.markdown("<div class='section-header about'>About Me</div>", unsafe_allow_html=True)
+st.markdown("""
+<div class='card about-card'>
+  <p class='muted'>I’m a developer with a unique path: from competing as a professional athlete to building software that powers real-world decisions. Today, I focus on creating intelligent, data-driven applications — from algorithmic trading systems to interactive AI tools.</p>
+  <p class='muted'>My technical toolkit spans Python, Java, JavaScript, C, F#, and Prolog, with experience across both enterprise frameworks (Spring Boot) and modern full-stack stacks (Node.js, React, MongoDB). I’m fluent in PostgreSQL and MongoDB, and enjoy working at the intersection of quantitative finance, AI/ML, and software engineering.</p>
+  <p class='muted'>Beyond code, I bring a global perspective — fluent in English, Afrikaans, German, and Slovak — and thrive in environments where technology, strategy, and creativity converge.</p>
+</div>
+""", unsafe_allow_html=True)
 
-My technical toolkit spans Python, Java, JavaScript, C, F#, and Prolog, with experience across both enterprise frameworks (Spring Boot) and modern full-stack stacks (Node.js, React, MongoDB). I’m fluent in PostgreSQL and MongoDB, and enjoy working at the intersection of quantitative finance, AI/ML, and software engineering.
-
-Beyond code, I bring a global perspective — fluent in English, Afrikaans, German, and Slovak — and thrive in environments where technology, strategy, and creativity converge.
-"""
 
 st.markdown("<div class='section-header'>About Me</div>", unsafe_allow_html=True)
 st.markdown(f"<div class='card'><p class='muted'>{about_me.replace(chr(10), '<br/><br/>')}</p></div>", unsafe_allow_html=True)
