@@ -5,7 +5,7 @@ import os
 from typing import List, Optional, Tuple, Any
 from streamlit_lottie import st_lottie
 
-# Optional auto-height helper
+# Optional auto-height helper (not required)
 try:
     from streamlit_js_eval import get_page_info
     _HAS_JS_EVAL = True
@@ -84,8 +84,7 @@ def _normalize_abs(p: str) -> str:
         return p
     p = p.strip().strip('"').strip("'")
     p = os.path.expanduser(p)
-    # If looks like Users/..., add leading slash
-    if p.startswith("Users/"):
+    if p.startswith("Users/"):  # add leading slash if omitted
         p = "/" + p
     return os.path.abspath(p) if not os.path.isabs(p) else p
 
@@ -125,7 +124,7 @@ def load_lottie(best_name_or_path: Optional[str], fallback_name: Optional[str] =
     data, used = load_lottie_from_candidates(local_candidates)
     return data, used
 
-def _iframe_height(auto_margin: int = 120, fallback: int = 1200) -> int:
+def _iframe_height(auto_margin: int = 120, fallback: int = 800) -> int:
     """
     Compute iframe height from browser viewport using streamlit-js-eval.
     Returns a sensible fallback if the module isn't available.
@@ -149,15 +148,11 @@ with st.sidebar:
         "Custom Lottie path (optional)",
         help="Paste an absolute path to a .json (handles missing leading '/' and double '.json.json')."
     )
-    if _HAS_JS_EVAL:
-        if st.button("🔄 Resize to window"):
-            # Recompute size on demand
-            try:
-                st.rerun()
-            except Exception:
-                st.experimental_rerun()
-    else:
-        st.caption("Tip: install `streamlit-js-eval` for auto-height → `pip install streamlit-js-eval`")
+    if _HAS_JS_EVAL and st.button("🔄 Resize to window"):
+        try:
+            st.rerun()
+        except Exception:
+            st.experimental_rerun()
 
 # --------------------------
 #     UI: EFFECTS
@@ -200,7 +195,7 @@ apps = {
 selected_app = st.selectbox("Select an app to run", list(apps.keys()))
 
 # --------------------------
-#     EMBEDDER WITH ROBUST CONFIRM BINDING + AUTO HEIGHT
+#     EMBEDDER: DYNAMIC WHITE BACKGROUND + CONFIRM BINDING
 # --------------------------
 if selected_app in apps:
     url_or_path = apps[selected_app]
@@ -216,12 +211,30 @@ if selected_app in apps:
             with open(app_path, "r", encoding="utf-8") as f:
                 html_content = f.read()
 
-            # Inject CSS (no fixed min-height)
+            # --- DYNAMIC WHITE CARD CONTAINER ---
+            # Body becomes transparent; card (#rr-container) is white, auto-height, padded.
             injected_css = """
 <style>
-  body { background-color: #f9f9f9 !important; }  /* removed min-height to allow natural growth */
+  /* Make page background transparent so extra iframe space isn't a big white box */
+  html, body {
+      background: transparent !important;
+  }
+
+  /* Our dynamic white card wrapper */
+  #rr-container {
+      background: #ffffff !important;
+      color: #000;               /* ensure readability inside */
+      display: inline-block;     /* shrink-wrap to content width */
+      padding: 16px 18px;
+      margin: 10px 12px;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+      max-width: 100%;
+  }
+
+  /* Keep original app pieces readable against white */
   .match, button, input, select, #initialSetup, #setup, #tournament, #final {
-      background-color: #f9f9f9 !important;
+      background-color: transparent !important;  /* now inside white card */
   }
   button {
       display: inline-block !important;
@@ -230,15 +243,31 @@ if selected_app in apps:
       cursor: pointer;
   }
   button:hover { background-color: #45a049 !important; }
-  #initialSetup { position: relative !important; z-index: 1000 !important; }
 </style>
 """
 
-            # Inject JS that safely defines and binds confirm action
+            # JS: wrap all body content in #rr-container; keep your confirm binding logic
             injected_js = """
 <script>
 (function(){
   function log(){ try { console.log.apply(console, arguments); } catch(e){} }
+
+  // Wrap everything in a white "card" that auto-sizes with content
+  function wrapInCard(){
+    if (document.getElementById('rr-container')) return;
+    var card = document.createElement('div');
+    card.id = 'rr-container';
+
+    // Move all current body children into the card
+    var currentScript = document.currentScript;
+    var kids = Array.prototype.slice.call(document.body.childNodes);
+    kids.forEach(function(node){
+      if (node !== card && node !== currentScript) {
+        card.appendChild(node);
+      }
+    });
+    document.body.appendChild(card);
+  }
 
   function ensureConfirmDefined(){
     if (typeof window.confirmPlayerCount === 'function') return true;
@@ -275,7 +304,6 @@ if selected_app in apps:
 
     if(!btn){ return false; }
     ensureConfirmDefined();
-
     btn.onclick = function(e){
       e.preventDefault();
       try {
@@ -290,14 +318,19 @@ if selected_app in apps:
   }
 
   function tryBind(){
+    wrapInCard();
     if (bindConfirm()) return;
 
     var mo = new MutationObserver(function(){
+      wrapInCard();
       bindConfirm();
     });
     mo.observe(document.documentElement || document.body, {childList:true, subtree:true});
 
-    [100, 300, 800, 1500].forEach(function(ms){ setTimeout(bindConfirm, ms); });
+    [100, 300, 800, 1500].forEach(function(ms){ setTimeout(function(){
+      wrapInCard();
+      bindConfirm();
+    }, ms); });
   }
 
   if (document.readyState === 'loading'){
@@ -317,8 +350,8 @@ if selected_app in apps:
             else:
                 modified_html = html_content + injected_css + injected_js
 
-            # --- Viewport-based auto height ---
-            iframe_height = _iframe_height(auto_margin=120, fallback=300)
+            # --- iframe height (tweak as you wish) ---
+            iframe_height = _iframe_height(auto_margin=120, fallback=800)
             st.components.v1.html(modified_html, height=iframe_height, scrolling=True)
 
         except Exception as e:
