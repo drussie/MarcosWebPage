@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tennis Round Robin Tournament App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        input, select, button {
+            margin: 10px 0;
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .match {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+        }
+        .match button {
+            width: 48%;
+            margin: 1%;
+        }
+        .match input {
+            width: 45%;
+            margin: 1%;
+        }
+        .match button.disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+
+<div id="initialSetup">
+    <h1>Tennis Round Robin Setup</h1>
+    <label for="numPlayers">Number of Players:</label>
+    <input type="number" id="numPlayers" min="2" max="20" value="4">
+    <button onclick="confirmPlayerCount()">Confirm</button>
+</div>
+
+<div id="setup" style="display:none;">
+    <h1>Enter Player Details</h1>
+    <div id="playerNames"></div>
+    <label for="format">Match Format:</label>
+    <select id="format">
+        <option value="points">Points</option>
+        <option value="games">Games</option>
+        <option value="best3">Best of 3 Sets</option>
+        <option value="best5">Best of 5 Sets</option>
+    </select>
+    <button onclick="startTournament()">Start Tournament</button>
+</div>
+
+<div id="tournament" style="display:none;">
+    <h1>Round <span id="currentRound"></span></h1>
+    <p>Play matches in <span id="formatDisplay"></span> format.</p>
+    <div id="matches"></div>
+    <button onclick="nextRound()">Next Round</button>
+    <div id="standings"></div>
+</div>
+
+<div id="final" style="display:none;">
+    <h1>Final Placings</h1>
+    <div id="placings"></div>
+</div>
+
+<script>
+    let players = [];
+    let format;
+    let formatText;
+    let schedule = [];
+    let currentRoundIndex = 0;
+    let scores = {};
+    let matchResults = {};
+
+    const formatMap = {
+        points: 'Points',
+        games: 'Games',
+        best3: 'Best of 3 Sets',
+        best5: 'Best of 5 Sets'
+    };
+
+    function confirmPlayerCount() {
+        let num = parseInt(document.getElementById('numPlayers').value);
+        if (num < 2 || num > 20) {
+            alert('Please enter a number of players between 2 and 20.');
+            return;
+        }
+        let div = document.getElementById('playerNames');
+        div.innerHTML = '';
+        for (let i = 1; i <= num; i++) {
+            div.innerHTML += `<label>Player ${i} Name:</label><input type="text" id="player${i}" placeholder="Player ${i}"><br>`;
+        }
+        document.getElementById('initialSetup').style.display = 'none';
+        document.getElementById('setup').style.display = 'block';
+    }
+
+    function generateSchedule(playersList) {
+        let n = playersList.length;
+        let addedBye = false;
+        if (n % 2 === 1) {
+            playersList = [...playersList];
+            playersList.push('BYE');
+            n++;
+            addedBye = true;
+        }
+        let mod = n - 1;
+        let fixed = playersList[mod];
+        let pairings = [];
+        let props = ['away', 'home'];
+        let template = { home: fixed, away: fixed, result: null, scores: {} };
+        let gameCount = n / 2;
+        let decr = 0;
+        let incr = -1;
+        for (let round = 1; round < n; round++) {
+            let games = [{
+                ...template,
+                [props[(round - 1) % 2]]: playersList[incr = (incr + 1) % mod]
+            }];
+            for (let k = 1; k < gameCount; k++) {
+                games.push({
+                    home: playersList[incr = (incr + 1) % mod],
+                    away: playersList[decr = (decr + mod - 1) % mod],
+                    result: null,
+                    scores: {}
+                });
+            }
+            if (addedBye) {
+                games = games.filter(g => g.home !== 'BYE' && g.away !== 'BYE');
+            }
+            pairings.push({ round, games });
+        }
+        return pairings;
+    }
+
+    function startTournament() {
+        let num = parseInt(document.getElementById('numPlayers').value);
+        format = document.getElementById('format').value;
+        formatText = formatMap[format];
+        players = [];
+        for (let i = 1; i <= num; i++) {
+            let name = document.getElementById(`player${i}`).value || `Player ${i}`;
+            players.push(name);
+            scores[name] = 0;
+            matchResults[name] = {};
+            players.forEach(p => {
+                if (p !== name) matchResults[name][p] = 0;
+            });
+        }
+        schedule = generateSchedule(players);
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('tournament').style.display = 'block';
+        document.getElementById('formatDisplay').innerText = formatText;
+        showRound();
+        showStandings();
+    }
+
+    function showRound() {
+        document.getElementById('currentRound').innerText = currentRoundIndex + 1;
+        let matchesDiv = document.getElementById('matches');
+        matchesDiv.innerHTML = '';
+        let round = schedule[currentRoundIndex];
+        round.games.forEach((game, index) => {
+            let div = document.createElement('div');
+            div.className = 'match';
+            div.innerHTML = `<strong>${game.home} vs ${game.away}</strong>`;
+            if (game.result) {
+                div.innerHTML += `<br>Result: ${game.result}`;
+                if (game.scores[game.home] !== undefined) {
+                    div.innerHTML += ` (${game.scores[game.home]} - ${game.scores[game.away]})`;
+                }
+            } else if (format === 'points' || format === 'games') {
+                div.innerHTML += `<br>
+                    <input type="number" id="score_${currentRoundIndex}_${index}_home" placeholder="${game.home} ${format === 'points' ? 'Points' : 'Games'}" min="0">
+                    <input type="number" id="score_${currentRoundIndex}_${index}_away" placeholder="${game.away} ${format === 'points' ? 'Points' : 'Games'}" min="0">
+                    <br><button onclick="submitScores(${currentRoundIndex}, ${index}, '${game.home.replace("'", "\\'")}', '${game.away.replace("'", "\\'")}')">Submit Scores</button>`;
+            } else {
+                div.innerHTML += `<br>
+                    <button onclick="win(${currentRoundIndex}, ${index}, '${game.home.replace("'", "\\'")}')">${game.home} Won</button>
+                    <button onclick="win(${currentRoundIndex}, ${index}, '${game.away.replace("'", "\\'")}')">${game.away} Won</button>`;
+            }
+            matchesDiv.appendChild(div);
+        });
+    }
+
+    function win(roundIdx, gameIdx, winner) {
+        let game = schedule[roundIdx].games[gameIdx];
+        if (game.result) return;
+        game.result = `${winner} won`;
+        scores[winner]++;
+        matchResults[winner][game.home === winner ? game.away : game.home]++;
+        showRound();
+        showStandings();
+    }
+
+    function submitScores(roundIdx, gameIdx, home, away) {
+        let game = schedule[roundIdx].games[gameIdx];
+        if (game.result) return;
+        let homeScore = parseInt(document.getElementById(`score_${roundIdx}_${gameIdx}_home`).value) || 0;
+        let awayScore = parseInt(document.getElementById(`score_${roundIdx}_${gameIdx}_away`).value) || 0;
+        game.scores[home] = homeScore;
+        game.scores[away] = awayScore;
+        game.result = 'Scores Recorded';
+        scores[home] += homeScore;
+        scores[away] += awayScore;
+        showRound();
+        showStandings();
+    }
+
+    function nextRound() {
+        let allDone = schedule[currentRoundIndex].games.every(g => g.result !== null);
+        if (!allDone) {
+            alert('Please complete all matches in this round before proceeding.');
+            return;
+        }
+        currentRoundIndex++;
+        if (currentRoundIndex < schedule.length) {
+            showRound();
+            showStandings();
+        } else {
+            document.getElementById('tournament').style.display = 'none';
+            document.getElementById('final').style.display = 'block';
+            showFinal();
+        }
+    }
+
+    function showStandings() {
+        let div = document.getElementById('standings');
+        div.innerHTML = '<h3>Current Standings</h3>';
+        let sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+        let label = (format === 'points' || format === 'games') ? 'Total' : 'Wins';
+        let table = `<table><tr><th>Player</th><th>${label}</th></tr>`;
+        sorted.forEach(([p, s]) => {
+            table += `<tr><td>${p}</td><td>${(format === 'points' || format === 'games') ? s.toFixed(0) : s.toFixed(1)}</td></tr>`;
+        });
+        table += '</table>';
+        div.innerHTML += table;
+    }
+
+    function showFinal() {
+        let div = document.getElementById('placings');
+        let sorted = Object.entries(scores).sort((a, b) => {
+            if (a[1] !== b[1]) return b[1] - a[1];
+            if (format === 'best3' || format === 'best5') {
+                let headToHead = matchResults[a[0]][b[0]] - matchResults[b[0]][a[0]];
+                return headToHead !== 0 ? headToHead : 0;
+            }
+            return 0;
+        });
+        let rank = 1;
+        let prevScore = sorted[0]?.[1];
+        let label = (format === 'points' || format === 'games') ? 'Total' : 'Wins';
+        let table = `<table><tr><th>Place</th><th>Player</th><th>${label}</th></tr>`;
+        sorted.forEach(([p, s], i) => {
+            if (i > 0 && s < prevScore) {
+                rank = i + 1;
+                prevScore = s;
+            } else if (i > 0 && s === prevScore && (format === 'best3' || format === 'best5')) {
+                let prevPlayer = sorted[i - 1][0];
+                if (matchResults[p][prevPlayer] === matchResults[prevPlayer][p]) {
+                    rank = i;
+                }
+            }
+            table += `<tr><td>${rank}</td><td>${p}</td><td>${(format === 'points' || format === 'games') ? s.toFixed(0) : s.toFixed(1)}</td></tr>`;
+            prevScore = s;
+        });
+        table += '</table>';
+        div.innerHTML = table;
+    }
+</script>
+
+</body>
+</html>
