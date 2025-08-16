@@ -15,8 +15,8 @@ st.set_page_config(page_title="Marcos Ondruska — Portfolio", page_icon="🎾",
 #     LINKS / CONTACT
 # --------------------------
 LINKEDIN_URL = "https://www.linkedin.com/in/marcos-ondruska-3b3a749/"
-GITHUB_URL   = "https://github.com/"                      # <- set your GitHub profile if you want
-X_URL        = "https://x.com/"                           # <- set your X/Twitter handle if you want
+GITHUB_URL   = "https://github.com/drussie"                      # <- set your GitHub profile if you want
+X_URL        = "https://x.com/drussie"                           # <- set your X/Twitter handle if you want
 EMAIL        = "marcosondruska@gmail.com"
 ROUND_ROBIN_APP = "https://marcoswebpage-k3rbpwxme7nzgk5rwdee3c.streamlit.app/"
 
