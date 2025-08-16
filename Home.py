@@ -16,7 +16,7 @@ st.set_page_config(page_title="Marcos Ondruska — Portfolio", page_icon="🎾",
 LINKEDIN_URL = "https://www.linkedin.com/in/marcos-ondruska-3b3a749/"
 GITHUB_URL   = "https://github.com/"                      # <- set your GitHub profile if you want
 X_URL        = "https://x.com/"                           # <- set your X/Twitter handle if you want
-EMAIL        = "marcosondruska@gmail.com"                 # <- provided
+EMAIL        = "marcosondruska@gmail.com"
 ROUND_ROBIN_APP = "https://marcoswebpage-k3rbpwxme7nzgk5rwdee3c.streamlit.app/"
 
 # --------------------------
@@ -32,11 +32,8 @@ st.markdown("""
         --brand-bg2: #1E90FF;
     }
     .stApp { background: linear-gradient(135deg, var(--brand-bg1), var(--brand-bg2)); color: white; }
-
-    /* Layout container: center + max width for polish */
     .block-container { max-width: 1100px; padding-top: 1rem; padding-bottom: 2rem; margin: 0 auto; }
 
-    /* Headings */
     h1,h2,h3,.section-header {
       font-family: 'Orbitron', sans-serif;
       letter-spacing: .5px;
@@ -45,7 +42,6 @@ st.markdown("""
     .hero-title { color: var(--brand-gold); font-size: 40px; margin: 0 0 6px 0; }
     .hero-sub   { color: #E6F0FF; font-family: 'Inter', sans-serif; font-size: 18px; margin-bottom: 16px; }
 
-    /* Buttons/links */
     a, .stButton>button { transition: all .2s ease; }
     a { color: var(--brand-mint) !important; text-decoration: none; }
     a:hover { color: var(--brand-gold) !important; text-decoration: underline; }
@@ -60,7 +56,6 @@ st.markdown("""
     }
     .btn-row .stButton>button:hover { transform: translateY(-1px); border-color: var(--brand-gold); }
 
-    /* Cards */
     .card {
       background: rgba(255,255,255,0.07);
       border: 1px solid rgba(255,255,255,0.18);
@@ -147,7 +142,6 @@ with left:
         "GPTCA A* Certified Coach • Software Developer (ML/Trading)</div>",
         unsafe_allow_html=True
     )
-    # Quick action buttons (no Round Robin header link here)
     btn_cols = st.columns([1,1,1,1])
     with btn_cols[0]:
         st.link_button("🔗 LinkedIn", LINKEDIN_URL, use_container_width=True)
@@ -163,6 +157,26 @@ with right:
         st_lottie(lottie_data, height=200, key="hero_anim")
         if lottie_used:
             st.caption(f"Animation: `{os.path.basename(lottie_used)}`")
+
+# --------------------------
+#     ABOUT ME (updated)
+# --------------------------
+st.markdown("<div class='section-header'>About Me</div>", unsafe_allow_html=True)
+st.markdown("""
+<div class="card">
+<p class="muted">
+I’m a <b>creative developer and former professional athlete</b> with a passion for building tools that solve real-world problems — from <b>algorithmic trading systems</b> to <b>interactive AI applications</b>.
+</p>
+<p class="muted" style="margin-bottom:0;">
+My background blends <b>software engineering</b> and <b>quantitative finance</b>: I work with
+<b>Python, Java, JavaScript, C, F#, and Prolog</b>, and have experience across full-stack and enterprise frameworks like
+<b>NERM</b> (Node.js, Express, React, MongoDB) and <b>Spring Boot</b>. I’m proficient with both <b>PostgreSQL</b> and <b>MongoDB</b>,
+which gives me flexibility for data-driven applications. Specialties include <b>algorithmic & quantitative trading</b>, <b>AI/ML</b>,
+and <b>capital markets</b>, with a foundation in <b>networking & systems</b> (Net-Centric Computing, Wireshark, administration).
+Beyond technology, I bring a <b>global perspective</b> — I speak <b>English, Afrikaans, German, and Slovak</b> fluently.
+</p>
+</div>
+""", unsafe_allow_html=True)
 
 # --------------------------
 #     TENNIS COACHING
@@ -216,9 +230,23 @@ Generate balanced round-robin schedules for 2–20 players with multiple scoring
 """)
     st.link_button("Open App", ROUND_ROBIN_APP, use_container_width=False)
 
+# --------------------------
+#     SKILLS SNAPSHOT
+# --------------------------
+st.markdown("<div class='section-header'>Skills Snapshot</div>", unsafe_allow_html=True)
 st.markdown("""
-<div class="card" style="margin-top:8px;">
-<b>Skills:</b> Python · Streamlit · ib_insync · PostgreSQL · Reinforcement Learning · YOLO · Transformers · Data Visualization
+<div class="card">
+<b>Programming Languages</b><br/>
+Python · Java · JavaScript · C · F# · Prolog
+<br/><br/>
+<b>Frameworks & Tech Stacks</b><br/>
+NERM (Node.js, Express, React, MongoDB) · Spring Boot
+<br/><br/>
+<b>Databases</b><br/>
+PostgreSQL · MongoDB
+<br/><br/>
+<b>Specializations</b><br/>
+Algorithmic & Quantitative Trading · Artificial Intelligence / Machine Learning · Capital Markets & Equities · Networking & Systems
 </div>
 """, unsafe_allow_html=True)
 
