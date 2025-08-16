@@ -5,8 +5,6 @@ import os
 import html
 from typing import List, Optional, Tuple, Any
 from streamlit_lottie import st_lottie
-from urllib.parse import quote
-import streamlit.components.v1 as components  # <-- for JS-based mailto
 
 # --------------------------
 #     PAGE CONFIG
@@ -52,7 +50,7 @@ st.markdown("""
     a { color: var(--brand-mint) !important; text-decoration: none; }
     a:hover { color: var(--brand-gold) !important; text-decoration: underline; }
 
-    /* Uniform button look (matches your dark buttons) */
+    /* Uniform dark pill buttons */
     .btn-like {
       display: inline-flex;
       align-items: center;
@@ -84,6 +82,7 @@ st.markdown("""
     .section-header { font-size: 26px; color: var(--brand-mint); margin: 8px 0 10px; }
     .muted { color: #D6E4FF; opacity: .9; }
 
+    /* About Me tweaks */
     .section-header.about { font-size: 20px; margin: 4px 0 6px; }
     .about-card { padding: 14px 16px; }
     .about-card p { margin: 0 0 8px; line-height: 1.35; }
@@ -91,6 +90,7 @@ st.markdown("""
     .stExpander { transition: transform .2s ease; }
     .stExpander:hover { transform: translateY(-2px); }
 
+    /* Badges */
     .pill-wall { display: flex; flex-wrap: wrap; gap: 10px 10px; align-items: center; margin-top: 6px; }
     .pill {
       display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px;
@@ -155,32 +155,13 @@ def load_lottie_prefer_local(name_or_abs_path: str) -> Tuple[Optional[Any], Opti
 lottie_data, lottie_used = load_lottie_prefer_local("Tennis Ball")
 
 # --------------------------
-#     LINK + MAILTO HELPERS
+#     HELPERS
 # --------------------------
 def link_button_like(label: str, url: str):
     st.markdown(
         f"<a class='btn-like' href='{html.escape(url)}' rel='noopener'>{html.escape(label)}</a>",
         unsafe_allow_html=True
     )
-
-def mailto_button_like(email: str, label: str, subject: str = "", body: str = ""):
-    """
-    Renders a uniform dark button and triggers the user's mail client via JS.
-    This prevents the extra blank tab some browsers show with plain mailto links.
-    """
-    params = []
-    if subject: params.append(f"subject={quote(subject)}")
-    if body:    params.append(f"body={quote(body)}")
-    qs = ("?" + "&".join(params)) if params else ""
-    mailto = f"mailto:{email}{qs}"
-
-    # Use a tiny component so onclick JS is allowed
-    html_block = f"""
-    <button class="btn-like" onclick="window.location.href='{mailto}'; return false;">
-      {html.escape(label)}
-    </button>
-    """
-    components.html(html_block, height=46)
 
 # --------------------------
 #     HEADER / HERO
@@ -201,7 +182,9 @@ with left:
     with btn_cols[2]:
         link_button_like("𝕏 Profile", X_URL or "https://x.com/")
     with btn_cols[3]:
-        mailto_button_like(EMAIL, "✉️ Email", subject="Hello Marcos", body="Hi Marcos,")
+        # Contact card instead of mailto button (always works, uniform look)
+        st.markdown(f"<div class='card' style='text-align:center; padding:10px 12px;'>"
+                    f"<b>Contact</b><br/>{html.escape(EMAIL)}</div>", unsafe_allow_html=True)
 
 with right:
     if lottie_data:
@@ -228,22 +211,25 @@ st.markdown("<div class='section-header'>Tennis Coaching</div>", unsafe_allow_ht
 st.markdown("""
 <div class="card">
   <p class="muted">I bring over 30 years of professional tennis experience to the court — from competing at the highest level (Olympics, ATP Tour, Davis Cup) to coaching players at all levels. My focus is on player development, mindset, and performance strategies that translate into real results.</p>
-  <ul class="muted" style="margin-bottom: 0;">
+  <ul class="muted" style="margin-bottom: 8px;">
     <li><b>Private Lessons</b> — 1-on-1 coaching tailored to your game</li>
     <li><b>Group Clinics & Camps</b> — competitive learning environments</li>
     <li><b>Performance Consulting</b> — match strategy, mental prep, and video analysis</li>
     <li><b>Junior Development</b> — long-term growth plans for young athletes</li>
   </ul>
+  <p class="muted" style="margin:0;"><b>Coaching inquiries:</b> {email}</p>
 </div>
-""", unsafe_allow_html=True)
+""".format(email=html.escape(EMAIL)), unsafe_allow_html=True)
 
 tc_cols = st.columns([1,1,1])
 with tc_cols[0]:
-    mailto_button_like(EMAIL, "Request a Session", subject="Tennis Coaching Inquiry", body="Hi Marcos,%0A%0AI'd like to schedule a session.")
+    st.markdown(f"<div class='card' style='text-align:center; padding:10px 12px;'>"
+                f"<b>Request a Session</b><br/>{html.escape(EMAIL)}</div>", unsafe_allow_html=True)
 with tc_cols[1]:
     link_button_like("View LinkedIn", LINKEDIN_URL)
 with tc_cols[2]:
-    mailto_button_like(EMAIL, "Contact by Email", subject="General Inquiry", body="Hi Marcos,")
+    st.markdown(f"<div class='card' style='text-align:center; padding:10px 12px;'>"
+                f"<b>Contact</b><br/>{html.escape(EMAIL)}</div>", unsafe_allow_html=True)
 
 # --------------------------
 #     SOFTWARE & DATA PROJECTS
@@ -269,7 +255,7 @@ with st.expander("🎾 Round Robin Tournament App (Streamlit)"):
     st.markdown("""
 Generate balanced round-robin schedules for 2–20 players with multiple scoring formats, live standings, and results entry. Designed with an auto-sizing UI container for a clean embed.
 """)
-    link_button_like("Open App", ROUND_ROBIN_APP)
+    st.markdown(f"<a class='btn-like' href='{ROUND_ROBIN_APP}'>Open App</a>", unsafe_allow_html=True)
 
 # --------------------------
 #     SKILLS — TAG CLOUD / BADGE WALL
@@ -277,13 +263,20 @@ Generate balanced round-robin schedules for 2–20 players with multiple scoring
 st.markdown("<div class='section-header'>Skills</div>", unsafe_allow_html=True)
 
 SKILLS: List[str] = [
-    "Python","Java","JavaScript","C","F#","Prolog",
-    "Spring Boot","Node.js","Express","React","Docker","JUnit","GitHub",
-    "PostgreSQL","MongoDB","SQL",
-    "REST APIs","OOP","Data Structures & Algorithms","Systems Programming","Networking","Linux",
-    "Algorithmic Trading","Quantitative Investing","AI/ML","Capital Markets",
-    "Unit Testing","Version Control","Scrum",
-    "Team Leadership","Coaching/Mentorship","English","Afrikaans","German","Slovak",
+    # Core programming
+    "Python", "Java", "JavaScript", "C", "F#", "Prolog",
+    # Frameworks & tools
+    "Spring Boot", "Node.js", "Express", "React", "Docker", "JUnit", "GitHub",
+    # Databases
+    "PostgreSQL", "MongoDB", "SQL",
+    # Web & CS
+    "REST APIs", "OOP", "Data Structures & Algorithms", "Systems Programming", "Networking", "Linux",
+    # Specializations
+    "Algorithmic Trading", "Quantitative Investing", "AI/ML", "Capital Markets",
+    # Practices
+    "Unit Testing", "Version Control", "Scrum",
+    # Leadership & Languages
+    "Team Leadership", "Coaching/Mentorship", "English", "Afrikaans", "German", "Slovak",
 ]
 
 pills_html = "<div class='card'><div class='pill-wall'>" + "".join(
@@ -295,15 +288,14 @@ st.markdown(pills_html, unsafe_allow_html=True)
 #     CONNECT
 # --------------------------
 st.markdown("<div class='section-header'>Connect</div>", unsafe_allow_html=True)
-lc1, lc2, lc3, lc4 = st.columns(4)
-with lc1:
-    st.markdown(f"<a class='btn-like' href='{LINKEDIN_URL}'>LinkedIn</a>", unsafe_allow_html=True)
-with lc2:
-    st.markdown(f"<a class='btn-like' href='{GITHUB_URL or 'https://github.com/'}'>GitHub</a>", unsafe_allow_html=True)
-with lc3:
-    st.markdown(f"<a class='btn-like' href='{X_URL or 'https://x.com/'}'>X (Twitter)</a>", unsafe_allow_html=True)
-with lc4:
-    mailto_button_like(EMAIL, "Email", subject="Hello Marcos", body="Hi Marcos,")
+st.markdown(f"""
+<div class="card">
+  <p style="margin:0 0 6px;"><b>LinkedIn:</b> <a href="{LINKEDIN_URL}">{LINKEDIN_URL}</a></p>
+  <p style="margin:0 0 6px;"><b>GitHub:</b> <a href="{GITHUB_URL}">{GITHUB_URL}</a></p>
+  <p style="margin:0 0 6px;"><b>X:</b> <a href="{X_URL}">{X_URL}</a></p>
+  <p style="margin:0;"><b>Email:</b> {html.escape(EMAIL)}</p>
+</div>
+""", unsafe_allow_html=True)
 
 # --------------------------
 #     FOOTER
