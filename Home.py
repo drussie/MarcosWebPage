@@ -5,7 +5,8 @@ import os
 import html
 from typing import List, Optional, Tuple, Any
 from streamlit_lottie import st_lottie
-from urllib.parse import quote  # <-- added
+from urllib.parse import quote
+import streamlit.components.v1 as components  # <-- for JS-based mailto
 
 # --------------------------
 #     PAGE CONFIG
@@ -48,34 +49,27 @@ st.markdown("""
     .hero-title { color: var(--brand-gold); font-size: 40px; margin: 0 0 6px 0; }
     .hero-sub   { color: #E6F0FF; font-family: 'Inter', sans-serif; font-size: 18px; margin-bottom: 16px; }
 
-    a, .stButton>button { transition: all .2s ease; }
     a { color: var(--brand-mint) !important; text-decoration: none; }
     a:hover { color: var(--brand-gold) !important; text-decoration: underline; }
 
-    .btn-row .stButton>button {
-      background: rgba(255,255,255,0.1);
-      color: white;
-      border: 1px solid rgba(255,255,255,0.25);
-      padding: 10px 16px;
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.2);
-    }
-    .btn-row .stButton>button:hover { transform: translateY(-1px); border-color: var(--brand-gold); }
-
-    /* Button-styled anchor for mailto */
+    /* Uniform button look (matches your dark buttons) */
     .btn-like {
-      display: inline-block;
-      background: rgba(255,255,255,0.1);
-      color: white !important;
-      border: 1px solid rgba(255,255,255,0.25);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       padding: 10px 16px;
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.2);
-      text-decoration: none !important;
-      text-align: center;
       width: 100%;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.55);
+      color: var(--brand-mint) !important;
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 8px 24px rgba(0,0,0,.20);
+      transition: transform .15s ease, border-color .15s ease, color .15s ease;
+      text-decoration: none !important;
+      font-weight: 600;
     }
-    .btn-like:hover { transform: translateY(-1px); border-color: var(--brand-gold); }
+    .btn-like:hover { transform: translateY(-1px); border-color: var(--brand-gold); color: var(--brand-gold) !important; }
 
     .card {
       background: rgba(255,255,255,0.07);
@@ -90,44 +84,19 @@ st.markdown("""
     .section-header { font-size: 26px; color: var(--brand-mint); margin: 8px 0 10px; }
     .muted { color: #D6E4FF; opacity: .9; }
 
-    /* Make JUST the About Me header smaller + tighter spacing */
-    .section-header.about { 
-      font-size: 20px;
-      margin: 4px 0 6px;
-    }
-    .about-card { 
-      padding: 14px 16px;
-    }
-    .about-card p { 
-      margin: 0 0 8px;
-      line-height: 1.35;
-    }
+    .section-header.about { font-size: 20px; margin: 4px 0 6px; }
+    .about-card { padding: 14px 16px; }
+    .about-card p { margin: 0 0 8px; line-height: 1.35; }
 
     .stExpander { transition: transform .2s ease; }
     .stExpander:hover { transform: translateY(-2px); }
 
-    /* --- Pill (badge wall) styles --- */
-    .pill-wall {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 10px;
-      align-items: center;
-      margin-top: 6px;
-    }
+    .pill-wall { display: flex; flex-wrap: wrap; gap: 10px 10px; align-items: center; margin-top: 6px; }
     .pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: var(--pill-bg);
-      color: var(--pill-txt);
-      border: 1px solid var(--pill-brd);
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      line-height: 1;
-      text-decoration: none;
-      transition: transform .15s ease, background .15s ease, border-color .15s ease;
-      outline: none;
+      display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px;
+      background: var(--pill-bg); color: var(--pill-txt); border: 1px solid var(--pill-brd);
+      font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1; text-decoration: none;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease; outline: none;
     }
     .pill:hover { background: var(--pill-hover); border-color: var(--brand-gold); transform: translateY(-1px); }
     .pill:focus-visible { box-shadow: 0 0 0 3px rgba(255,215,0,0.35); }
@@ -143,23 +112,18 @@ def _fix_json_extension(p: str) -> List[str]:
     candidates: List[str] = []
     low = p.lower()
     if low.endswith(".json.json"):
-        candidates.append(p)
-        candidates.append(p[:-5])
+        candidates.append(p); candidates.append(p[:-5])
     elif low.endswith(".json"):
-        candidates.append(p)
-        candidates.append(p + ".json")
+        candidates.append(p); candidates.append(p + ".json")
     else:
-        candidates.append(p + ".json")
-        candidates.append(p + ".json.json")
+        candidates.append(p + ".json"); candidates.append(p + ".json.json")
     return candidates
 
 def _normalize_abs(p: str) -> str:
-    if not p:
-        return p
+    if not p: return p
     p = p.strip().strip('"').strip("'")
     p = os.path.expanduser(p)
-    if p.startswith("Users/"):
-        p = "/" + p
+    if p.startswith("Users/"): p = "/" + p
     return os.path.abspath(p) if not os.path.isabs(p) else p
 
 def _load_lottie_candidates(cands: List[str]) -> Tuple[Optional[Any], Optional[str]]:
@@ -175,8 +139,7 @@ def load_lottie_prefer_local(name_or_abs_path: str) -> Tuple[Optional[Any], Opti
     if name_or_abs_path:
         abs_norm = _normalize_abs(name_or_abs_path)
         data, used = _load_lottie_candidates(_fix_json_extension(abs_norm))
-        if data is not None:
-            return data, used
+        if data is not None: return data, used
     here = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(here)
     search_bases = [
@@ -186,33 +149,38 @@ def load_lottie_prefer_local(name_or_abs_path: str) -> Tuple[Optional[Any], Opti
         os.path.join(project_root, "assets", name_or_abs_path),
     ]
     candidates: List[str] = []
-    for base in search_bases:
-        candidates.extend(_fix_json_extension(base))
+    for base in search_bases: candidates.extend(_fix_json_extension(base))
     return _load_lottie_candidates(candidates)
 
-# Try to load a tennis-themed Lottie (adjust path name if needed)
 lottie_data, lottie_used = load_lottie_prefer_local("Tennis Ball")
 
 # --------------------------
-#     MAILTO HELPER
+#     LINK + MAILTO HELPERS
 # --------------------------
-def mailto_link(email: str, label: str, subject: str = "", body: str = "", full_width: bool = True) -> None:
-    """
-    Renders a button-styled anchor that opens the user's default mail client
-    without spawning a blank new tab (works better than st.link_button for mailto).
-    """
-    params = []
-    if subject:
-        params.append(f"subject={quote(subject)}")
-    if body:
-        params.append(f"body={quote(body)}")
-    qs = ("?" + "&".join(params)) if params else ""
-    href = f"mailto:{email}{qs}"
-    width_style = "style='width:100%; display:inline-block;'" if full_width else ""
+def link_button_like(label: str, url: str):
     st.markdown(
-        f"<a class='btn-like' href='{href}' {width_style} rel='noopener'>{html.escape(label)}</a>",
+        f"<a class='btn-like' href='{html.escape(url)}' rel='noopener'>{html.escape(label)}</a>",
         unsafe_allow_html=True
     )
+
+def mailto_button_like(email: str, label: str, subject: str = "", body: str = ""):
+    """
+    Renders a uniform dark button and triggers the user's mail client via JS.
+    This prevents the extra blank tab some browsers show with plain mailto links.
+    """
+    params = []
+    if subject: params.append(f"subject={quote(subject)}")
+    if body:    params.append(f"body={quote(body)}")
+    qs = ("?" + "&".join(params)) if params else ""
+    mailto = f"mailto:{email}{qs}"
+
+    # Use a tiny component so onclick JS is allowed
+    html_block = f"""
+    <button class="btn-like" onclick="window.location.href='{mailto}'; return false;">
+      {html.escape(label)}
+    </button>
+    """
+    components.html(html_block, height=46)
 
 # --------------------------
 #     HEADER / HERO
@@ -227,14 +195,13 @@ with left:
     )
     btn_cols = st.columns([1,1,1,1])
     with btn_cols[0]:
-        st.link_button("🔗 LinkedIn", LINKEDIN_URL, use_container_width=True)
+        link_button_like("🔗 LinkedIn", LINKEDIN_URL)
     with btn_cols[1]:
-        st.link_button("💻 GitHub", GITHUB_URL or "https://github.com/", use_container_width=True)
+        link_button_like("💻 GitHub", GITHUB_URL or "https://github.com/")
     with btn_cols[2]:
-        st.link_button("𝕏 Profile", X_URL or "https://x.com/", use_container_width=True)
+        link_button_like("𝕏 Profile", X_URL or "https://x.com/")
     with btn_cols[3]:
-        # Replaced st.link_button for email with a mailto anchor
-        mailto_link(EMAIL, "✉️ Email", subject="Hello Marcos", body="Hi Marcos,", full_width=True)
+        mailto_button_like(EMAIL, "✉️ Email", subject="Hello Marcos", body="Hi Marcos,")
 
 with right:
     if lottie_data:
@@ -243,7 +210,7 @@ with right:
             st.caption(f"<span class='cap'>Animation: {os.path.basename(lottie_used)}</span>", unsafe_allow_html=True)
 
 # --------------------------
-#     ABOUT ME (smaller header + tighter spacing)
+#     ABOUT ME
 # --------------------------
 st.markdown("<div class='section-header about'>About Me</div>", unsafe_allow_html=True)
 st.markdown("""
@@ -272,11 +239,11 @@ st.markdown("""
 
 tc_cols = st.columns([1,1,1])
 with tc_cols[0]:
-    mailto_link(EMAIL, "Request a Session", subject="Tennis Coaching Inquiry", body="Hi Marcos,\n\nI'd like to schedule a session.")
+    mailto_button_like(EMAIL, "Request a Session", subject="Tennis Coaching Inquiry", body="Hi Marcos,%0A%0AI'd like to schedule a session.")
 with tc_cols[1]:
-    st.link_button("View LinkedIn", LINKEDIN_URL, use_container_width=True)
+    link_button_like("View LinkedIn", LINKEDIN_URL)
 with tc_cols[2]:
-    mailto_link(EMAIL, "Contact by Email", subject="General Inquiry", body="Hi Marcos,")
+    mailto_button_like(EMAIL, "Contact by Email", subject="General Inquiry", body="Hi Marcos,")
 
 # --------------------------
 #     SOFTWARE & DATA PROJECTS
@@ -302,7 +269,7 @@ with st.expander("🎾 Round Robin Tournament App (Streamlit)"):
     st.markdown("""
 Generate balanced round-robin schedules for 2–20 players with multiple scoring formats, live standings, and results entry. Designed with an auto-sizing UI container for a clean embed.
 """)
-    st.link_button("Open App", ROUND_ROBIN_APP, use_container_width=False)
+    link_button_like("Open App", ROUND_ROBIN_APP)
 
 # --------------------------
 #     SKILLS — TAG CLOUD / BADGE WALL
@@ -310,20 +277,13 @@ Generate balanced round-robin schedules for 2–20 players with multiple scoring
 st.markdown("<div class='section-header'>Skills</div>", unsafe_allow_html=True)
 
 SKILLS: List[str] = [
-    # Core programming
-    "Python", "Java", "JavaScript", "C", "F#", "Prolog",
-    # Frameworks & tools
-    "Spring Boot", "Node.js", "Express", "React", "Docker", "JUnit", "GitHub",
-    # Databases
-    "PostgreSQL", "MongoDB", "SQL",
-    # Web & CS
-    "REST APIs", "OOP", "Data Structures & Algorithms", "Systems Programming", "Networking", "Linux",
-    # Specializations
-    "Algorithmic Trading", "Quantitative Investing", "AI/ML", "Capital Markets",
-    # Practices
-    "Unit Testing", "Version Control", "Scrum",
-    # Leadership & Languages
-    "Team Leadership", "Coaching/Mentorship", "English", "Afrikaans", "German", "Slovak",
+    "Python","Java","JavaScript","C","F#","Prolog",
+    "Spring Boot","Node.js","Express","React","Docker","JUnit","GitHub",
+    "PostgreSQL","MongoDB","SQL",
+    "REST APIs","OOP","Data Structures & Algorithms","Systems Programming","Networking","Linux",
+    "Algorithmic Trading","Quantitative Investing","AI/ML","Capital Markets",
+    "Unit Testing","Version Control","Scrum",
+    "Team Leadership","Coaching/Mentorship","English","Afrikaans","German","Slovak",
 ]
 
 pills_html = "<div class='card'><div class='pill-wall'>" + "".join(
@@ -337,14 +297,13 @@ st.markdown(pills_html, unsafe_allow_html=True)
 st.markdown("<div class='section-header'>Connect</div>", unsafe_allow_html=True)
 lc1, lc2, lc3, lc4 = st.columns(4)
 with lc1:
-    st.markdown(f"[LinkedIn]({LINKEDIN_URL})")
+    st.markdown(f"<a class='btn-like' href='{LINKEDIN_URL}'>LinkedIn</a>", unsafe_allow_html=True)
 with lc2:
-    st.markdown(f"[GitHub]({GITHUB_URL or 'https://github.com/'})")
+    st.markdown(f"<a class='btn-like' href='{GITHUB_URL or 'https://github.com/'}'>GitHub</a>", unsafe_allow_html=True)
 with lc3:
-    st.markdown(f"[X (Twitter)]({X_URL or 'https://x.com/'})")
+    st.markdown(f"<a class='btn-like' href='{X_URL or 'https://x.com/'}'>X (Twitter)</a>", unsafe_allow_html=True)
 with lc4:
-    # Use the same button-styled anchor for consistency (small, not full width here)
-    mailto_link(EMAIL, "Email", subject="Hello Marcos", body="Hi Marcos,", full_width=False)
+    mailto_button_like(EMAIL, "Email", subject="Hello Marcos", body="Hi Marcos,")
 
 # --------------------------
 #     FOOTER
