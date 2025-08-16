@@ -206,8 +206,11 @@ st.markdown("""
 # --------------------------
 #     TENNIS COACHING
 # --------------------------
+# --------------------------
+#     TENNIS COACHING
+# --------------------------
 st.markdown("<div class='section-header'>Tennis Coaching</div>", unsafe_allow_html=True)
-st.markdown("""
+st.markdown(f"""
 <div class="card">
   <p class="muted">I bring over 30 years of professional tennis experience to the court — from competing at the highest level (Olympics, ATP Tour, Davis Cup) to coaching players at all levels. My focus is on player development, mindset, and performance strategies that translate into real results.</p>
   <ul class="muted" style="margin-bottom: 8px;">
@@ -216,19 +219,9 @@ st.markdown("""
     <li><b>Performance Consulting</b> — match strategy, mental prep, and video analysis</li>
     <li><b>Junior Development</b> — long-term growth plans for young athletes</li>
   </ul>
-  <p class="muted" style="margin:0;"><b>Coaching inquiries:</b> {email}</p>
+  <p class="muted" style="margin:0;"><b>Coaching inquiries:</b> {html.escape(EMAIL)}</p>
 </div>
-""".format(email=html.escape(EMAIL)), unsafe_allow_html=True)
-
-tc_cols = st.columns([1,1,1])
-with tc_cols[0]:
-    st.markdown(f"<div class='card' style='text-align:center; padding:10px 12px;'>"
-                f"<b>Request a Session</b><br/>{html.escape(EMAIL)}</div>", unsafe_allow_html=True)
-with tc_cols[1]:
-    link_button_like("View LinkedIn", LINKEDIN_URL)
-with tc_cols[2]:
-    st.markdown(f"<div class='card' style='text-align:center; padding:10px 12px;'>"
-                f"<b>Contact</b><br/>{html.escape(EMAIL)}</div>", unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # --------------------------
 #     SOFTWARE & DATA PROJECTS
