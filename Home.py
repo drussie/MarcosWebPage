@@ -4,6 +4,8 @@ import json
 import os
 from typing import List, Optional, Tuple, Any
 from streamlit_lottie import st_lottie
+import html
+
 
 # --------------------------
 #     PAGE CONFIG
@@ -288,9 +290,10 @@ SKILLS: List[str] = [
 
 # Render as pill wall
 pills_html = "<div class='card'><div class='pill-wall'>" + "".join(
-    f"<span class='pill' tabindex='0'>{st.escape_markdown(s)}</span>" for s in SKILLS
+    f"<span class='pill' tabindex='0'>{html.escape(s)}</span>" for s in SKILLS
 ) + "</div></div>"
 st.markdown(pills_html, unsafe_allow_html=True)
+
 
 # --------------------------
 #     CONNECT
