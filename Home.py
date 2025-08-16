@@ -166,6 +166,9 @@ def link_button_like(label: str, url: str):
 # --------------------------
 #     HEADER / HERO
 # --------------------------
+# --------------------------
+#     HEADER / HERO
+# --------------------------
 left, right = st.columns([3, 1])
 with left:
     st.markdown("<h1 class='hero-title'>Marcos Ondruska</h1>", unsafe_allow_html=True)
@@ -174,17 +177,13 @@ with left:
         "GPTCA A* Certified Coach • Software Developer (ML/Trading, Spring Boot, MERN)</div>",
         unsafe_allow_html=True
     )
-    btn_cols = st.columns([1,1,1,1])
+    btn_cols = st.columns([1,1,1])  # only 3 columns now
     with btn_cols[0]:
         link_button_like("🔗 LinkedIn", LINKEDIN_URL)
     with btn_cols[1]:
         link_button_like("💻 GitHub", GITHUB_URL or "https://github.com/")
     with btn_cols[2]:
         link_button_like("𝕏 Profile", X_URL or "https://x.com/")
-    with btn_cols[3]:
-        # Contact card instead of mailto button (always works, uniform look)
-        st.markdown(f"<div class='card' style='text-align:center; padding:10px 12px;'>"
-                    f"<b>Contact</b><br/>{html.escape(EMAIL)}</div>", unsafe_allow_html=True)
 
 with right:
     if lottie_data:
