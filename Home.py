@@ -74,6 +74,19 @@ st.markdown("""
     .section-header { font-size: 26px; color: var(--brand-mint); margin: 8px 0 10px; }
     .muted { color: #D6E4FF; opacity: .9; }
 
+    /* Make JUST the About Me header smaller + tighter spacing */
+    .section-header.about { 
+      font-size: 20px;            /* smaller than default 26px */
+      margin: 4px 0 6px;          /* tighter spacing */
+    }
+    .about-card { 
+      padding: 14px 16px;         /* slightly tighter padding */
+    }
+    .about-card p { 
+      margin: 0 0 8px;            /* reduce paragraph gaps */
+      line-height: 1.35;          /* tighter line height */
+    }
+
     .stExpander { transition: transform .2s ease; }
     .stExpander:hover { transform: translateY(-2px); }
 
@@ -192,20 +205,16 @@ with right:
             st.caption(f"<span class='cap'>Animation: {os.path.basename(lottie_used)}</span>", unsafe_allow_html=True)
 
 # --------------------------
-#     ABOUT ME (refactored)
+#     ABOUT ME (smaller header + tighter spacing)
 # --------------------------
 st.markdown("<div class='section-header about'>About Me</div>", unsafe_allow_html=True)
 st.markdown("""
-<div class='card about-card'>
-  <p class='muted'>I’m a developer with a unique path: from competing as a professional athlete to building software that powers real-world decisions. Today, I focus on creating intelligent, data-driven applications — from algorithmic trading systems to interactive AI tools.</p>
-  <p class='muted'>My technical toolkit spans Python, Java, JavaScript, C, F#, and Prolog, with experience across both enterprise frameworks (Spring Boot) and modern full-stack stacks (Node.js, React, MongoDB). I’m fluent in PostgreSQL and MongoDB, and enjoy working at the intersection of quantitative finance, AI/ML, and software engineering.</p>
-  <p class='muted'>Beyond code, I bring a global perspective — fluent in English, Afrikaans, German, and Slovak — and thrive in environments where technology, strategy, and creativity converge.</p>
+<div class="card about-card">
+  <p class="muted">I’m a developer with a unique path: from competing as a professional athlete to building software that powers real-world decisions. Today, I focus on creating intelligent, data-driven applications — from algorithmic trading systems to interactive AI tools.</p>
+  <p class="muted">My technical toolkit spans Python, Java, JavaScript, C, F#, and Prolog, with experience across both enterprise frameworks (Spring Boot) and modern full-stack stacks (Node.js, React, MongoDB). I’m fluent in PostgreSQL and MongoDB, and enjoy working at the intersection of quantitative finance, AI/ML, and software engineering.</p>
+  <p class="muted">Beyond code, I bring a global perspective — fluent in English, Afrikaans, German, and Slovak — and thrive in environments where technology, strategy, and creativity converge.</p>
 </div>
 """, unsafe_allow_html=True)
-
-
-st.markdown("<div class='section-header'>About Me</div>", unsafe_allow_html=True)
-st.markdown(f"<div class='card'><p class='muted'>{about_me.replace(chr(10), '<br/><br/>')}</p></div>", unsafe_allow_html=True)
 
 # --------------------------
 #     TENNIS COACHING
@@ -213,15 +222,13 @@ st.markdown(f"<div class='card'><p class='muted'>{about_me.replace(chr(10), '<br
 st.markdown("<div class='section-header'>Tennis Coaching</div>", unsafe_allow_html=True)
 st.markdown("""
 <div class="card">
-<p class="muted">
-I bring over 30 years of professional tennis experience to the court — from competing at the highest level (Olympics, ATP Tour, Davis Cup) to coaching players at all levels. My focus is on player development, mindset, and performance strategies that translate into real results.
-</p>
-<ul class="muted" style="margin-bottom: 0;">
-  <li><b>Private Lessons</b> — 1-on-1 coaching tailored to your game</li>
-  <li><b>Group Clinics & Camps</b> — competitive learning environments</li>
-  <li><b>Performance Consulting</b> — match strategy, mental prep, and video analysis</li>
-  <li><b>Junior Development</b> — long-term growth plans for young athletes</li>
-</ul>
+  <p class="muted">I bring over 30 years of professional tennis experience to the court — from competing at the highest level (Olympics, ATP Tour, Davis Cup) to coaching players at all levels. My focus is on player development, mindset, and performance strategies that translate into real results.</p>
+  <ul class="muted" style="margin-bottom: 0;">
+    <li><b>Private Lessons</b> — 1-on-1 coaching tailored to your game</li>
+    <li><b>Group Clinics & Camps</b> — competitive learning environments</li>
+    <li><b>Performance Consulting</b> — match strategy, mental prep, and video analysis</li>
+    <li><b>Junior Development</b> — long-term growth plans for young athletes</li>
+  </ul>
 </div>
 """, unsafe_allow_html=True)
 
