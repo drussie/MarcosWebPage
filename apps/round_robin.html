@@ -1,303 +1,254 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tennis Round Robin Tournament App</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        input, select, button {
-            margin: 10px 0;
-            padding: 8px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .match {
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin: 10px 0;
-            background-color: #f9f9f9;
-        }
-        .match button {
-            width: 48%;
-            margin: 1%;
-        }
-        .match input {
-            width: 45%;
-            margin: 1%;
-        }
-        .match button.disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-    </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Tennis Round Robin</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0b0f19"/>
+  <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
+  <div class="container">
+    <div class="header">
+      <h1>Tennis Round Robin</h1>
+      <div class="actions">
+        <button class="btn" id="undoBtn" title="Undo last change">Undo</button>
+        <button class="btn" id="saveBtn">Save</button>
+        <button class="btn" id="loadBtn">Load</button>
+        <button class="btn danger" id="clearBtn">Clear</button>
+      </div>
+    </div>
 
-<div id="initialSetup">
-    <h1>Tennis Round Robin Setup</h1>
-    <label for="numPlayers">Number of Players:</label>
-    <input type="number" id="numPlayers" min="2" max="20" value="4">
-    <button onclick="confirmPlayerCount()">Confirm</button>
-</div>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="card-title">Setup</div>
+        <div class="row">
+          <div>
+            <label for="eventName">Event Name</label>
+            <input class="input" id="eventName" value="Club RR">
+          </div>
+          <div>
+            <label for="players">Players (comma-separated)</label>
+            <input class="input" id="players" value="Alice,Bob,Carla,Diego,Erin,Frank">
+          </div>
+        </div>
 
-<div id="setup" style="display:none;">
-    <h1>Enter Player Details</h1>
-    <div id="playerNames"></div>
-    <label for="format">Match Format:</label>
-    <select id="format">
-        <option value="points">Points</option>
-        <option value="games">Games</option>
-        <option value="best3">Best of 3 Sets</option>
-        <option value="best5">Best of 5 Sets</option>
-    </select>
-    <button onclick="startTournament()">Start Tournament</button>
-</div>
+        <div class="row">
+          <div>
+            <label for="format">Format</label>
+            <select id="format" class="input">
+              <option value="games" selected>Games (to X)</option>
+              <option value="points">Points (to X)</option>
+              <option value="sets">Best of N sets</option>
+            </select>
+          </div>
+          <div>
+            <label for="target">Target (X)</label>
+            <input class="input" id="target" type="number" value="6" min="1" max="21">
+          </div>
+        </div>
 
-<div id="tournament" style="display:none;">
-    <h1>Round <span id="currentRound"></span></h1>
-    <p>Play matches in <span id="formatDisplay"></span> format.</p>
-    <div id="matches"></div>
-    <button onclick="nextRound()">Next Round</button>
-    <div id="standings"></div>
-</div>
+        <div class="row">
+          <button class="btn primary" id="genBtn">Generate Schedule</button>
+        </div>
+      </div>
 
-<div id="final" style="display:none;">
-    <h1>Final Placings</h1>
-    <div id="placings"></div>
-</div>
+      <div class="card">
+        <div class="card-title">Standings</div>
+        <div id="standings" class="small">No matches yet.</div>
+      </div>
+    </div>
 
-<script>
-    let players = [];
-    let format;
-    let formatText;
-    let schedule = [];
-    let currentRoundIndex = 0;
-    let scores = {};
-    let matchResults = {};
+    <div class="card" style="margin-top:20px">
+      <div class="card-title">Matches</div>
+      <div id="matches">Generate a schedule to begin.</div>
+    </div>
+  </div>
 
-    const formatMap = {
-        points: 'Points',
-        games: 'Games',
-        best3: 'Best of 3 Sets',
-        best5: 'Best of 5 Sets'
+  <script type="module">
+    import { $, $$ } from '/assets/site.js';
+
+    // Persistent state + undo stack
+    const KEY = 'rr:v1';
+    const state = {
+      meta: { name: 'Club RR', format: 'games', target: 6 },
+      players: [],
+      rounds: [] // [{matches:[{a,b,scoreA,scoreB,done}]}]
     };
+    const undoStack = [];
 
-    function confirmPlayerCount() {
-        let num = parseInt(document.getElementById('numPlayers').value);
-        if (num < 2 || num > 20) {
-            alert('Please enter a number of players between 2 and 20.');
-            return;
-        }
-        let div = document.getElementById('playerNames');
-        div.innerHTML = '';
-        for (let i = 1; i <= num; i++) {
-            div.innerHTML += `<label>Player ${i} Name:</label><input type="text" id="player${i}" placeholder="Player ${i}"><br>`;
-        }
-        document.getElementById('initialSetup').style.display = 'none';
-        document.getElementById('setup').style.display = 'block';
+    function pushUndo() {
+      undoStack.push(JSON.stringify(state));
+      if (undoStack.length > 50) undoStack.shift();
+      $('#undoBtn').disabled = undoStack.length === 0;
+    }
+    function undo() {
+      if (!undoStack.length) return;
+      const prev = undoStack.pop();
+      const obj = JSON.parse(prev);
+      Object.assign(state, obj);
+      render();
+      $('#undoBtn').disabled = undoStack.length === 0;
     }
 
-    function generateSchedule(playersList) {
-        let n = playersList.length;
-        let addedBye = false;
-        if (n % 2 === 1) {
-            playersList = [...playersList];
-            playersList.push('BYE');
-            n++;
-            addedBye = true;
-        }
-        let mod = n - 1;
-        let fixed = playersList[mod];
-        let pairings = [];
-        let props = ['away', 'home'];
-        let template = { home: fixed, away: fixed, result: null, scores: {} };
-        let gameCount = n / 2;
-        let decr = 0;
-        let incr = -1;
-        for (let round = 1; round < n; round++) {
-            let games = [{
-                ...template,
-                [props[(round - 1) % 2]]: playersList[incr = (incr + 1) % mod]
-            }];
-            for (let k = 1; k < gameCount; k++) {
-                games.push({
-                    home: playersList[incr = (incr + 1) % mod],
-                    away: playersList[decr = (decr + mod - 1) % mod],
-                    result: null,
-                    scores: {}
-                });
-            }
-            if (addedBye) {
-                games = games.filter(g => g.home !== 'BYE' && g.away !== 'BYE');
-            }
-            pairings.push({ round, games });
-        }
-        return pairings;
+    function save() {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }
+    function load() {
+      const s = localStorage.getItem(KEY);
+      if (s) { Object.assign(state, JSON.parse(s)); render(); }
+    }
+    function clearAll() {
+      pushUndo();
+      state.meta = { name:'', format:'games', target:6 };
+      state.players = [];
+      state.rounds = [];
+      render();
+      save();
     }
 
-    function startTournament() {
-        let num = parseInt(document.getElementById('numPlayers').value);
-        format = document.getElementById('format').value;
-        formatText = formatMap[format];
-        players = [];
-        for (let i = 1; i <= num; i++) {
-            let name = document.getElementById(`player${i}`).value || `Player ${i}`;
-            players.push(name);
-            scores[name] = 0;
-            matchResults[name] = {};
-            players.forEach(p => {
-                if (p !== name) matchResults[name][p] = 0;
-            });
-        }
-        schedule = generateSchedule(players);
-        document.getElementById('setup').style.display = 'none';
-        document.getElementById('tournament').style.display = 'block';
-        document.getElementById('formatDisplay').innerText = formatText;
-        showRound();
-        showStandings();
+    function parsePlayers(str) {
+      return str.split(',').map(s=>s.trim()).filter(Boolean);
     }
 
-    function showRound() {
-        document.getElementById('currentRound').innerText = currentRoundIndex + 1;
-        let matchesDiv = document.getElementById('matches');
-        matchesDiv.innerHTML = '';
-        let round = schedule[currentRoundIndex];
-        round.games.forEach((game, index) => {
-            let div = document.createElement('div');
-            div.className = 'match';
-            div.innerHTML = `<strong>${game.home} vs ${game.away}</strong>`;
-            if (game.result) {
-                div.innerHTML += `<br>Result: ${game.result}`;
-                if (game.scores[game.home] !== undefined) {
-                    div.innerHTML += ` (${game.scores[game.home]} - ${game.scores[game.away]})`;
-                }
-            } else if (format === 'points' || format === 'games') {
-                div.innerHTML += `<br>
-                    <input type="number" id="score_${currentRoundIndex}_${index}_home" placeholder="${game.home} ${format === 'points' ? 'Points' : 'Games'}" min="0">
-                    <input type="number" id="score_${currentRoundIndex}_${index}_away" placeholder="${game.away} ${format === 'points' ? 'Points' : 'Games'}" min="0">
-                    <br><button onclick="submitScores(${currentRoundIndex}, ${index}, '${game.home.replace("'", "\\'")}', '${game.away.replace("'", "\\'")}')">Submit Scores</button>`;
-            } else {
-                div.innerHTML += `<br>
-                    <button onclick="win(${currentRoundIndex}, ${index}, '${game.home.replace("'", "\\'")}')">${game.home} Won</button>
-                    <button onclick="win(${currentRoundIndex}, ${index}, '${game.away.replace("'", "\\'")}')">${game.away} Won</button>`;
-            }
-            matchesDiv.appendChild(div);
+    function generateSchedule(players) {
+      const ps = players.slice();
+      if (ps.length % 2 === 1) ps.push('BYE');
+      const n = ps.length;
+      const rounds = [];
+      const arr = ps.slice(1);
+      for (let r=0;r<n-1;r++) {
+        const round = { matches: [] };
+        const left = [ps[0], ...arr.slice(0, (n/2)-1)];
+        const right = arr.slice((n/2)-1).reverse();
+        for (let i=0;i<left.length;i++) {
+          const a = left[i], b = right[i];
+          round.matches.push({ a, b, scoreA:0, scoreB:0, done:false });
+        }
+        rounds.push(round);
+        // rotate
+        arr.unshift(arr.pop());
+      }
+      return rounds;
+    }
+
+    function standings() {
+      const table = new Map(); // name -> {wins,losses,played,for,against}
+      state.players.forEach(p=>table.set(p,{wins:0,losses:0,played:0,for:0,against:0}));
+      state.rounds.forEach(r=>r.matches.forEach(m=>{
+        if (!m.done) return;
+        if (m.a === 'BYE' || m.b === 'BYE') return;
+        const ta = table.get(m.a), tb = table.get(m.b);
+        ta.played++; tb.played++;
+        ta.for += m.scoreA; ta.against += m.scoreB;
+        tb.for += m.scoreB; tb.against += m.scoreA;
+        if (m.scoreA > m.scoreB) { ta.wins++; tb.losses++; }
+        else if (m.scoreB > m.scoreA) { tb.wins++; ta.losses++; }
+      }));
+      return Array.from(table.entries()).map(([name,st])=>({name,...st})).sort((x,y)=>{
+        if (y.wins !== x.wins) return y.wins - x.wins;
+        const diffX = x.for - x.against, diffY = y.for - y.against;
+        if (diffY !== diffX) return diffY - diffX;
+        return y.for - x.for;
+      });
+    }
+
+    function render() {
+      // Header inputs reflect state
+      $('#eventName').value = state.meta.name || 'Club RR';
+      $('#format').value = state.meta.format || 'games';
+      $('#target').value = state.meta.target || 6;
+      $('#players').value = state.players.join(',');
+
+      // Matches
+      const wrap = $('#matches');
+      if (!state.rounds.length) { wrap.textContent = 'Generate a schedule to begin.'; }
+      else {
+        wrap.innerHTML = state.rounds.map((round, idx)=>{
+          const ms = round.matches.map((m, j)=>{
+            const disabled = (m.a==='BYE' || m.b==='BYE') ? 'disabled' : '';
+            return `<div class="card" style="margin:8px 0;">
+              <div class="row" style="align-items:end;">
+                <div><label>Match</label><div><strong>R${idx+1}</strong> — ${m.a} vs ${m.b}</div></div>
+                <div>
+                  <label>${m.a} score</label>
+                  <input class="input" type="number" min="0" value="${m.scoreA}" data-r="${idx}" data-m="${j}" data-side="A" ${disabled}>
+                </div>
+                <div>
+                  <label>${m.b} score</label>
+                  <input class="input" type="number" min="0" value="${m.scoreB}" data-r="${idx}" data-m="${j}" data-side="B" ${disabled}>
+                </div>
+                <button class="btn" data-r="${idx}" data-m="${j}" data-action="commit" ${disabled}>Commit</button>
+                <button class="btn" data-r="${idx}" data-m="${j}" data-action="reset" ${disabled}>Reset</button>
+              </div>
+            </div>`;
+          }).join('');
+          return `<div class="card">
+            <div class="card-title">Round ${idx+1}</div>
+            ${ms}
+          </div>`;
+        }).join('');
+      }
+
+      // Standings
+      const st = standings();
+      const sEl = $('#standings');
+      if (!st.length) sEl.textContent = 'No matches yet.';
+      else {
+        sEl.innerHTML = `<div class="table-wrap"><table>
+          <thead><tr><th>Player</th><th>W</th><th>L</th><th>Diff</th><th>For</th><th>Against</th></tr></thead>
+          <tbody>${st.map(x=>`<tr><td>${x.name}</td><td>${x.wins}</td><td>${x.losses}</td><td>${x.for - x.against}</td><td>${x.for}</td><td>${x.against}</td></tr>`).join('')}</tbody>
+        </table></div>`;
+      }
+
+      // Wire match inputs
+      $$('#matches input[type="number"]').forEach(inp=>{
+        inp.addEventListener('input', (e)=>{
+          const r = +inp.dataset.r, m = +inp.dataset.m, side = inp.dataset.side;
+          const val = Math.max(0, +inp.value || 0);
+          const match = state.rounds[r].matches[m];
+          if (side === 'A') match.scoreA = val; else match.scoreB = val;
         });
-    }
-
-    function win(roundIdx, gameIdx, winner) {
-        let game = schedule[roundIdx].games[gameIdx];
-        if (game.result) return;
-        game.result = `${winner} won`;
-        scores[winner]++;
-        matchResults[winner][game.home === winner ? game.away : game.home]++;
-        showRound();
-        showStandings();
-    }
-
-    function submitScores(roundIdx, gameIdx, home, away) {
-        let game = schedule[roundIdx].games[gameIdx];
-        if (game.result) return;
-        let homeScore = parseInt(document.getElementById(`score_${roundIdx}_${gameIdx}_home`).value) || 0;
-        let awayScore = parseInt(document.getElementById(`score_${roundIdx}_${gameIdx}_away`).value) || 0;
-        game.scores[home] = homeScore;
-        game.scores[away] = awayScore;
-        game.result = 'Scores Recorded';
-        scores[home] += homeScore;
-        scores[away] += awayScore;
-        showRound();
-        showStandings();
-    }
-
-    function nextRound() {
-        let allDone = schedule[currentRoundIndex].games.every(g => g.result !== null);
-        if (!allDone) {
-            alert('Please complete all matches in this round before proceeding.');
-            return;
-        }
-        currentRoundIndex++;
-        if (currentRoundIndex < schedule.length) {
-            showRound();
-            showStandings();
-        } else {
-            document.getElementById('tournament').style.display = 'none';
-            document.getElementById('final').style.display = 'block';
-            showFinal();
-        }
-    }
-
-    function showStandings() {
-        let div = document.getElementById('standings');
-        div.innerHTML = '<h3>Current Standings</h3>';
-        let sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-        let label = (format === 'points' || format === 'games') ? 'Total' : 'Wins';
-        let table = `<table><tr><th>Player</th><th>${label}</th></tr>`;
-        sorted.forEach(([p, s]) => {
-            table += `<tr><td>${p}</td><td>${(format === 'points' || format === 'games') ? s.toFixed(0) : s.toFixed(1)}</td></tr>`;
+      });
+      $$('#matches button').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          const r = +btn.dataset.r, m = +btn.dataset.m, action = btn.dataset.action;
+          const match = state.rounds[r].matches[m];
+          if (action === 'commit') {
+            if (match.a==='BYE' || match.b==='BYE') return;
+            pushUndo();
+            match.done = true;
+          } else if (action === 'reset') {
+            pushUndo();
+            match.scoreA = 0; match.scoreB = 0; match.done = false;
+          }
+          save(); render();
         });
-        table += '</table>';
-        div.innerHTML += table;
+      });
     }
 
-    function showFinal() {
-        let div = document.getElementById('placings');
-        let sorted = Object.entries(scores).sort((a, b) => {
-            if (a[1] !== b[1]) return b[1] - a[1];
-            if (format === 'best3' || format === 'best5') {
-                let headToHead = matchResults[a[0]][b[0]] - matchResults[b[0]][a[0]];
-                return headToHead !== 0 ? headToHead : 0;
-            }
-            return 0;
-        });
-        let rank = 1;
-        let prevScore = sorted[0]?.[1];
-        let label = (format === 'points' || format === 'games') ? 'Total' : 'Wins';
-        let table = `<table><tr><th>Place</th><th>Player</th><th>${label}</th></tr>`;
-        sorted.forEach(([p, s], i) => {
-            if (i > 0 && s < prevScore) {
-                rank = i + 1;
-                prevScore = s;
-            } else if (i > 0 && s === prevScore && (format === 'best3' || format === 'best5')) {
-                let prevPlayer = sorted[i - 1][0];
-                if (matchResults[p][prevPlayer] === matchResults[prevPlayer][p]) {
-                    rank = i;
-                }
-            }
-            table += `<tr><td>${rank}</td><td>${p}</td><td>${(format === 'points' || format === 'games') ? s.toFixed(0) : s.toFixed(1)}</td></tr>`;
-            prevScore = s;
-        });
-        table += '</table>';
-        div.innerHTML = table;
-    }
-</script>
+    // UI actions
+    $('#genBtn').addEventListener('click', ()=>{
+      pushUndo();
+      state.meta.name = $('#eventName').value.trim() || 'Club RR';
+      state.meta.format = $('#format').value;
+      state.meta.target = Math.max(1, +$('#target').value || 6);
+      state.players = parsePlayers($('#players').value);
 
+      state.rounds = generateSchedule(state.players);
+      save(); render();
+    });
+
+    $('#undoBtn').addEventListener('click', undo);
+    $('#saveBtn').addEventListener('click', ()=>{ save(); const t=$('#saveBtn').textContent; $('#saveBtn').textContent='Saved'; setTimeout(()=>$('#saveBtn').textContent=t,900); });
+    $('#loadBtn').addEventListener('click', ()=>{ load(); const t=$('#loadBtn').textContent; $('#loadBtn').textContent='Loaded'; setTimeout(()=>$('#loadBtn').textContent=t,900); });
+    $('#clearBtn').addEventListener('click', ()=>{ if (confirm('Clear tournament and standings?')) { clearAll(); } });
+
+    // Initial
+    load();
+    if (!state.players.length) render();
+    $('#undoBtn').disabled = true;
+  </script>
 </body>
 </html>
