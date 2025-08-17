@@ -1,178 +1,90 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Car Loan Calculator</title>
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#0b0f19"/>
-  <link rel="stylesheet" href="/assets/site.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f7fa; }
+    h1 { color: #333; }
+    .container { max-width: 800px; margin: auto; background: #fff; padding: 20px;
+                 border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+    label { display: block; margin: 10px 0 5px; }
+    input { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc;
+            border-radius: 4px;}
+    button { padding: 10px 20px; background: #007bff; color: #fff; border: none;
+             border-radius: 4px; cursor: pointer;}
+    button:hover { background: #0056b3; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px;}
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: right; }
+    th { background: #f0f0f0; }
+    canvas { margin-top: 20px; }
+  </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <h1>Car Loan Calculator</h1>
-      <div class="actions">
-        <button class="btn" id="copyLinkBtn">Copy Link</button>
-        <a class="btn" href="/mortgage_calculator.html">Mortgage →</a>
-      </div>
-    </div>
+    <h1>Car Loan Calculator</h1>
+    <label for="price">Vehicle Price ($)</label>
+    <input type="number" id="price" value="30000">
+    <label for="down">Down Payment ($)</label>
+    <input type="number" id="down" value="5000">
+    <label for="rate">APR (%)</label>
+    <input type="number" id="rate" value="5">
+    <label for="months">Term (months)</label>
+    <input type="number" id="months" value="60">
+    <label for="tax">Sales Tax (%)</label>
+    <input type="number" id="tax" value="7">
+    <label for="fees">Fees ($)</label>
+    <input type="number" id="fees" value="500">
+    <button onclick="calculate()">Calculate</button>
 
-    <div class="grid grid-2">
-      <form class="card" id="loanForm" aria-describedby="kpis">
-        <div class="card-title">Inputs</div>
-
-        <div class="row">
-          <div>
-            <label for="price">Vehicle Price ($)</label>
-            <input class="input" type="number" id="price" name="price" min="0" step="100" value="45000" required>
-          </div>
-          <div>
-            <label for="down">Down Payment ($)</label>
-            <input class="input" type="number" id="down" name="down" min="0" step="100" value="5000">
-          </div>
-        </div>
-
-        <div class="row">
-          <div>
-            <label for="rate">APR (%)</label>
-            <input class="input" type="number" id="rate" name="rate" min="0" max="50" step="0.01" value="5.75">
-          </div>
-          <div>
-            <label for="months">Term (months)</label>
-            <input class="input" type="number" id="months" name="months" min="1" max="120" step="1" value="60">
-          </div>
-        </div>
-
-        <div class="row">
-          <div>
-            <label for="tax">Sales Tax (%)</label>
-            <input class="input" type="number" id="tax" name="tax" min="0" max="20" step="0.1" value="7">
-          </div>
-          <div>
-            <label for="fees">Fees ($)</label>
-            <input class="input" type="number" id="fees" name="fees" min="0" step="1" value="600">
-          </div>
-        </div>
-
-        <div class="row">
-          <button type="button" class="btn primary" id="calcBtn">Calculate</button>
-          <button type="button" class="btn" id="resetBtn">Reset</button>
-        </div>
-      </form>
-
-      <div class="card" id="kpis" aria-live="polite">
-        <div class="card-title">Summary</div>
-        <div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="kpi"><div class="label">Monthly</div><div class="value" id="kpiMonthly">$0</div></div>
-          <div class="kpi"><div class="label">Total Paid</div><div class="value" id="kpiTotal">$0</div></div>
-          <div class="kpi"><div class="label">Interest</div><div class="value" id="kpiInterest">$0</div></div>
-        </div>
-        <div class="small" style="margin-top:10px">Shareable link reflects your current inputs.</div>
-        <div class="card" style="margin-top:16px">
-          <canvas id="chart" height="120"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:20px">
-      <div class="card-title">Amortization Schedule</div>
-      <div class="table-wrap">
-        <table id="table">
-          <thead>
-            <tr><th>Month</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-
+    <h3 id="summary"></h3>
+    <canvas id="chart" height="100"></canvas>
+    <table id="schedule"></table>
   </div>
 
-  <script type="module">
-    import { $, $$, clamp, fmtCurrency, parseQuery, bindFormToQuery, readForm } from '/assets/site.js';
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    function pmt(rate, nper, pv) {
+      return rate===0 ? -(pv/nper) :
+        -(pv*rate*Math.pow(1+rate,nper))/(Math.pow(1+rate,nper)-1);
+    }
+    function calculate() {
+      const price = +document.getElementById('price').value;
+      const down  = +document.getElementById('down').value;
+      const rate  = (+document.getElementById('rate').value/100)/12;
+      const months= +document.getElementById('months').value;
+      const tax   = +document.getElementById('tax').value/100;
+      const fees  = +document.getElementById('fees').value;
 
-    // Finance helpers
-    const pmt = (r, n, pv) => r === 0 ? -(pv/n) : -(pv*r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);
-
-    let chart;
-
-    function compute(state) {
-      const price  = +state.price || 0;
-      const down   = clamp(+state.down || 0, 0, price);
-      const rate   = clamp(+state.rate || 0, 0, 50)/100/12;
-      const months = clamp(+state.months || 0, 1, 120);
-      const tax    = clamp(+state.tax || 0, 0, 20)/100;
-      const fees   = clamp(+state.fees || 0, 0, 1e6);
-
-      const taxable = Math.max(price - down, 0);
-      const loanAmt = taxable * (1 + tax) + fees;
-      const pay = Math.abs(pmt(rate, months, loanAmt));
-      const rows = [];
-      let bal = loanAmt, totalInt = 0;
-
+      const loanAmt = (price - down)*(1+tax)+fees;
+      const pay = Math.abs(pmt(rate,months,loanAmt));
+      let bal=loanAmt, totalInt=0;
+      const rows=[];
       for (let i=1;i<=months;i++) {
-        const interest = rate * bal;
-        const principal = Math.min(pay - interest, bal);
-        bal = Math.max(bal - principal, 0);
-        totalInt += interest;
-        rows.push([i, pay, principal, interest, bal]);
+        const intr = bal*rate;
+        const prin = pay-intr;
+        bal = Math.max(bal-prin,0);
+        totalInt += intr;
+        rows.push([i,pay,prin,intr,bal]);
       }
-
-      // KPIs
-      $('#kpiMonthly').textContent  = fmtCurrency(pay);
-      $('#kpiTotal').textContent    = fmtCurrency(pay*months);
-      $('#kpiInterest').textContent = fmtCurrency(totalInt);
-
-      // Table
-      const tbody = $('#table tbody');
-      tbody.innerHTML = rows.map(r =>
-        `<tr>
-          <td>${r[0]}</td>
-          <td>${fmtCurrency(r[1])}</td>
-          <td>${fmtCurrency(r[2])}</td>
-          <td>${fmtCurrency(r[3])}</td>
-          <td>${fmtCurrency(r[4])}</td>
-        </tr>`).join('');
-
-      // Chart
-      const labels = rows.map(r=>r[0]);
-      const princ  = rows.map(r=>r[2]);
-      const intr   = rows.map(r=>r[3]);
-      const balArr = rows.map(r=>r[4]);
-
-      if (chart) chart.destroy();
-      chart = new Chart($('#chart'), {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { type:'bar', label:'Principal', data:princ },
-            { type:'bar', label:'Interest', data:intr },
-            { type:'line', label:'Balance', data:balArr }
-          ]
-        },
-        options: { responsive:true, scales:{ y:{ beginAtZero:true } } }
+      document.getElementById('summary').innerText =
+        `Monthly: $${pay.toFixed(2)} | Total Paid: $${(pay*months).toFixed(2)} | Interest: $${totalInt.toFixed(2)}`;
+      const tbl=document.getElementById('schedule');
+      tbl.innerHTML = `<tr><th>Month</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>`+
+        rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1].toFixed(2)}</td><td>${r[2].toFixed(2)}</td><td>${r[3].toFixed(2)}</td><td>${r[4].toFixed(2)}</td></tr>`).join('');
+      const ctx=document.getElementById('chart').getContext('2d');
+      if(window.loanChart) window.loanChart.destroy();
+      window.loanChart = new Chart(ctx,{
+        type:'line',
+        data:{labels:rows.map(r=>r[0]),datasets:[
+          {label:'Balance',data:rows.map(r=>r[4]),borderColor:'blue',fill:false},
+          {label:'Principal',data:rows.map(r=>r[2]),borderColor:'green',fill:false},
+          {label:'Interest',data:rows.map(r=>r[3]),borderColor:'red',fill:false}
+        ]}
       });
     }
-
-    const form = $('#loanForm');
-    bindFormToQuery(form, (state)=>compute(state), { debounceMs: 120 });
-    compute(readForm(form));
-
-    $('#calcBtn').addEventListener('click', ()=>compute(readForm(form)));
-    $('#resetBtn').addEventListener('click', ()=>{
-      form.reset();
-      history.replaceState(null,'','');
-      compute(readForm(form));
-    });
-
-    $('#copyLinkBtn').addEventListener('click', async ()=>{
-      await navigator.clipboard.writeText(location.href);
-      const btn = $('#copyLinkBtn'); const t = btn.textContent;
-      btn.textContent = 'Copied!'; setTimeout(()=>btn.textContent=t, 1200);
-    });
+    calculate();
   </script>
 </body>
 </html>
