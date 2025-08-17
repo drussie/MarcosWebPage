@@ -225,7 +225,7 @@ st.markdown(f"""
 # --------------------------
 st.markdown("<div class='section-header'>Software & Data Projects</div>", unsafe_allow_html=True)
 
-with st.expander("📈 Intraday Trading Engine (IB + Python)", expanded=True):
+with st.expander("📈 Intraday Trading Engine (IB + Python)"):
     st.markdown("""
 Automated equity strategy using Interactive Brokers (ib_insync), ATR initial stops, EMA trailing stops, Telegram alerts, and PostgreSQL logging. Includes RVOL scanner, premarket breakout logic, and daily diagnostics.
 """)
