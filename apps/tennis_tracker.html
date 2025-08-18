@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tennis Score & Stats Tracker</title>
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Fallback utility if Tailwind fails */
+    .shadow-soft { box-shadow: 0 8px 30px rgba(0,0,0,.08); }
+    .grid-auto { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: .75rem; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="max-w-6xl mx-auto p-4 md:p-6 lg:p-8">
+    <header class="mb-6 flex items-start md:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold">🎾 Tennis Score & Stats Tracker</h1>
+        <p class="text-slate-600">Track score, point-by-point outcomes, and rich stats for both players. Data auto-saves to this browser.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btnExportCSV" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 shadow-sm text-sm">Export CSV</button>
+        <button id="btnExportJSON" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 shadow-sm text-sm">Export JSON</button>
+        <label class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 shadow-sm text-sm cursor-pointer">
+          Import JSON
+          <input id="inputImportJSON" type="file" accept="application/json" class="hidden"/>
+        </label>
+      </div>
+    </header>
+
+    <!-- Match Setup -->
+    <section class="mb-6 bg-white border rounded-2xl shadow-sm p-4 md:p-6">
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium">Player 1 name</label>
+          <input id="p0name" class="mt-1 w-full px-3 py-2 rounded-xl border" placeholder="Player 1"/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium">Player 2 name</label>
+          <input id="p1name" class="mt-1 w-full px-3 py-2 rounded-xl border" placeholder="Player 2"/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium">Best of</label>
+          <select id="bestOf" class="mt-1 w-full px-3 py-2 rounded-xl border">
+            <option value="3">3 sets</option>
+            <option value="5">5 sets</option>
+          </select>
+          <div class="mt-3 flex items-center gap-3 text-sm">
+            <label class="flex items-center gap-2">
+              <input id="tba66" type="checkbox" class="accent-slate-800" checked/>
+              Tiebreak at 6–6
+            </label>
+            <label class="flex items-center gap-2">
+              <input id="finalSetTB" type="checkbox" class="accent-slate-800" checked/>
+              Final set uses TB
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <div class="text-sm">Server:</div>
+        <label class="flex items-center gap-2 text-sm">
+          <input type="radio" name="server" id="server0" class="accent-slate-800"/> <span id="server0lbl">Player 1</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm">
+          <input type="radio" name="server" id="server1" class="accent-slate-800"/> <span id="server1lbl">Player 2</span>
+        </label>
+        <button id="btnNewMatch" class="ml-auto px-3 py-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 text-sm">New match / Reset</button>
+        <button id="btnUndo" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm">Undo last point</button>
+      </div>
+    </section>
+
+    <!-- Scoreboard -->
+    <section class="mb-6 grid lg:grid-cols-2 gap-6">
+      <div class="bg-white border rounded-2xl shadow-sm p-4 md:p-6">
+        <h2 class="font-semibold mb-3">Scoreboard</h2>
+        <div id="scoreboard" class="overflow-x-auto"></div>
+        <div class="mt-3 text-sm text-slate-600" id="scoreHints"></div>
+      </div>
+
+      <!-- Stats summary -->
+      <div class="bg-white border rounded-2xl shadow-sm p-4 md:p-6">
+        <h2 class="font-semibold mb-3">Quick Stats</h2>
+        <div id="quickStats" class="grid md:grid-cols-2 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- Point Entry -->
+    <section class="mb-6 bg-white border rounded-2xl shadow-sm p-4 md:p-6">
+      <h2 class="font-semibold mb-4">Record a Point</h2>
+      <form id="pointForm" class="grid md:grid-cols-2 gap-6">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium">Server for this point</label>
+            <div class="mt-2 flex items-center gap-4 text-sm">
+              <label class="flex items-center gap-2">
+                <input type="radio" name="pf_server" value="0" class="accent-slate-800"/> <span id="pf_server0">Player 1</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="radio" name="pf_server" value="1" class="accent-slate-800"/> <span id="pf_server1">Player 2</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium">Serve result</label>
+            <select name="serveResult" class="mt-1 w-full px-3 py-2 rounded-xl border">
+              <option value="1stin">1st serve in</option>
+              <option value="1stout_2ndin">1st out → 2nd in</option>
+              <option value="df">Double fault (2nd out)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium">Point ended by</label>
+            <div class="mt-1 grid grid-cols-2 gap-2 text-sm">
+              <label class="flex items-center gap-2">
+                <input type="radio" name="endType" value="winner" class="accent-slate-800" checked/>
+                Winner
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="radio" name="endType" value="error" class="accent-slate-800"/>
+                Error
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium">By which player?</label>
+              <select name="byPlayer" class="mt-1 w-full px-3 py-2 rounded-xl border">
+                <option value="0">Player 1</option>
+                <option value="1">Player 2</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium">Category</label>
+              <select name="category" class="mt-1 w-full px-3 py-2 rounded-xl border">
+                <option value="fh">FH</option>
+                <option value="bh">BH</option>
+                <option value="serve">Serve</option>
+                <option value="fhv">FHV</option>
+                <option value="bhv">BHV</option>
+                <option value="oh">OH</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="forcedWrap" class="hidden">
+            <label class="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" name="forced" class="accent-slate-800"/> Forced error
+            </label>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium">Comment (optional)</label>
+            <textarea name="comment" rows="2" class="mt-1 w-full px-3 py-2 rounded-xl border" placeholder="e.g., long rally; P1 drop-shot winner"></textarea>
+          </div>
+          <div class="flex items-center gap-3">
+            <button class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium" type="submit">Record point</button>
+            <button id="btnClearComment" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm" type="button">Clear</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-sm text-slate-600">Tips</div>
+          <ul class="mt-2 text-sm list-disc pl-5 space-y-1 text-slate-700">
+            <li>Use <em>Serve → Double fault</em> for DF; returner automatically wins the point.</li>
+            <li>For aces/service winners, choose <em>Winner</em> by the server with category <em>Serve</em>.</li>
+            <li>First-serve% is computed from service points: 1st-in / attempts.</li>
+            <li>Use <em>Undo</em> if you mis-tap. Everything is saved locally and can be exported.</li>
+          </ul>
+          <div class="mt-4 p-3 rounded-xl bg-slate-50 border text-xs text-slate-600" id="lastPoint"></div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Detailed Stats -->
+    <section class="mb-8 bg-white border rounded-2xl shadow-sm p-4 md:p-6">
+      <h2 class="font-semibold mb-4">Detailed Stats</h2>
+      <div id="detailedStats" class="grid md:grid-cols-2 gap-6"></div>
+    </section>
+
+    <!-- Point Log -->
+    <section class="mb-16 bg-white border rounded-2xl shadow-sm p-4 md:p-6">
+      <h2 class="font-semibold mb-4">Point Log & Comments</h2>
+      <div id="pointLog" class="space-y-2"></div>
+    </section>
+  </div>
+
+  <script>
+  // ---------- Utilities ----------
+  const deepClone = (o) => JSON.parse(JSON.stringify(o));
+  const pct = (num, den) => den ? (100 * num / den) : 0;
+  const asScore = (gp) => gp===0?"0":gp===1?"15":gp===2?"30":gp===3?"40":gp===4?"Ad":"";
+
+  // ---------- State ----------
+  const LS_KEY = 'tennisTrackerStateV1';
+  let undoStack = [];
+
+  const emptyStats = () => ({
+    firstServe: {attempts:0, in:0},
+    aces: 0,
+    doubleFaults: 0,
+    winners: { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
+    errors:  { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
+    forcedErrors:  { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
+    pointsWon: 0,
+    servicePointsWon: 0,
+    servicePointsPlayed: 0,
+    returnPointsWon: 0,
+    returnPointsPlayed: 0,
+    serviceGamesPlayed: 0,
+    serviceGamesHeld: 0,
+    returnGamesPlayed: 0,
+    breaks: 0,
+  });
+
+  const newMatchState = () => ({
+    players: [ { name: 'Player 1', stats: emptyStats() }, { name: 'Player 2', stats: emptyStats() } ],
+    settings: { bestOf: 3, tiebreakAtSixSix: true, finalSetTB: true },
+    server: 0, // index of server
+    sets: [ { games: [0,0], tiebreak: false, tbPoints: [0,0] } ],
+    gamePoints: [0,0], // 0,1,2,3,4(Ad)
+    history: [], // array of point objects
+  });
+
+  let state = loadState() || newMatchState();
+
+  function saveState() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch(e){ return null; }
+  }
+
+  function pushUndo() { undoStack.push(JSON.stringify(state)); if (undoStack.length>200) undoStack.shift(); }
+  function undo() {
+    if (!undoStack.length) return;
+    const prev = undoStack.pop();
+    state = JSON.parse(prev);
+    renderAll();
+    saveState();
+  }
+
+  // ---------- Scoring Logic ----------
+  function currentSet() { return state.sets[state.sets.length-1]; }
+
+  function pointTo(playerIdx) {
+    const opp = 1 - playerIdx;
+    const set = currentSet();
+
+    if (set.tiebreak) {
+      set.tbPoints[playerIdx]++;
+      const w = set.tbPoints[playerIdx], l = set.tbPoints[opp];
+      if (w>=7 && (w-l)>=2) {
+        // set won via tiebreak -> score 7-6 or 6-7
+        set.games[playerIdx]++;
+        finishSet(playerIdx, true);
+      }
+    } else {
+      const w = state.gamePoints[playerIdx];
+      const l = state.gamePoints[opp];
+      if (w <= 2) {
+        state.gamePoints[playerIdx]++;
+      } else if (w === 3 && l < 3) {
+        gameWonBy(playerIdx);
+      } else if (w === 3 && l === 3) {
+        state.gamePoints[playerIdx] = 4; // Advantage
+      } else if (w === 4) {
+        gameWonBy(playerIdx);
+      } else if (l === 4) {
+        state.gamePoints[opp] = 3; // back to deuce
+      }
+    }
+  }
+
+  function gameWonBy(playerIdx) {
+    const set = currentSet();
+    set.games[playerIdx]++;
+
+    // Service game stats
+    const server = state.server;
+    const returner = 1 - server;
+    state.players[server].stats.serviceGamesPlayed++;
+    state.players[returner].stats.returnGamesPlayed++;
+    if (playerIdx === server) {
+      state.players[server].stats.serviceGamesHeld++;
+    } else {
+      state.players[returner].stats.breaks++;
+    }
+
+    // Reset game points & rotate server
+    state.gamePoints = [0,0];
+    state.server = 1 - state.server;
+
+    // Set finished?
+    const w = set.games[playerIdx];
+    const l = set.games[1-playerIdx];
+
+    const needTB = (w===6 && l===6 && state.settings.tiebreakAtSixSix && (state.settings.finalSetTB || (state.sets.length < state.settings.bestOf)));
+    if (needTB) {
+      set.tiebreak = true;
+      set.tbPoints = [0,0];
+      return;
+    }
+
+    if (w>=6 && (w-l)>=2) {
+      finishSet(playerIdx, false);
+    }
+  }
+
+  function finishSet(winnerIdx, viaTB) {
+    // Start a new set if match not finished
+    const setsWon = setsWonBy();
+    const bestOf = state.settings.bestOf;
+    if (setsWon[winnerIdx] + 1 > Math.floor(bestOf/2)) {
+      // match over; keep final set, no new set created
+      // (We still mark the set that just finished)
+    } else {
+      state.sets.push({ games: [0,0], tiebreak: false, tbPoints: [0,0] });
+      // In real rules, server for new set depends on parity/tiebreak; we continue rotation.
+    }
+  }
+
+  function setsWonBy() {
+    const w = [0,0];
+    for (const s of state.sets) {
+      if (s.games[0] > s.games[1]) w[0]++;
+      else if (s.games[1] > s.games[0]) w[1]++;
+    }
+    return w;
+  }
+
+  // ---------- Point Recording ----------
+  function recordPoint(formData) {
+    const server = +formData.get('pf_server');
+    const serveResult = formData.get('serveResult'); // 1stin | 1stout_2ndin | df
+    const endType = formData.get('endType'); // winner | error
+    const byPlayer = +formData.get('byPlayer');
+    const category = formData.get('category'); // fh,bh,serve,fhv,bhv,oh
+    const comment = (formData.get('comment')||'').trim();
+
+    const point = {
+      server,
+      serve: { firstAttempt: true, firstIn: (serveResult==='1stin'), doubleFault: (serveResult==='df'), secondIn: (serveResult==='1stout_2ndin') },
+      outcome: endType,
+      byPlayer,
+      category,
+      forced: endType==='error' ? !!formData.get('forced') : false,
+      comment,
+      timestamp: Date.now()
+    };
+
+    // Validate edge cases
+    if (serveResult==='df') {
+      // point winner is returner
+      point.winner = 1 - server;
+      point.doubleFault = true;
+    } else if (endType==='winner') {
+      point.winner = byPlayer;
+    } else if (endType==='error') {
+      point.winner = 1 - byPlayer;
+    }
+
+    applyPoint(point);
+  }
+
+  function applyPoint(point) {
+    pushUndo();
+
+    // Update first-serve stats for server
+    const sIdx = point.server;
+    state.players[sIdx].stats.firstServe.attempts++;
+    if (point.serve.firstIn) state.players[sIdx].stats.firstServe.in++;
+
+    // Service/return points played
+    state.players[sIdx].stats.servicePointsPlayed++;
+    state.players[1-sIdx].stats.returnPointsPlayed++;
+
+    // Aces / DFs / winners / errors
+    const winner = point.winner;
+    const loser = 1 - winner;
+
+    if (point.doubleFault) {
+      state.players[sIdx].stats.doubleFaults++;
+      state.players[winner].stats.pointsWon++;
+      state.players[sIdx].stats.servicePointsWon += (winner===sIdx?1:0);
+      state.players[1-sIdx].stats.returnPointsWon += (winner===(1-sIdx)?1:0);
+      // Score
+      pointTo(winner);
+      finalizePoint(point);
+      return;
+    }
+
+    if (point.outcome==='winner') {
+      if (point.category==='serve' && winner===sIdx) {
+        state.players[sIdx].stats.aces++;
+      }
+      state.players[winner].stats.winners[point.category]++;
+    } else if (point.outcome==='error') {
+      state.players[byPlayer(point)].stats.errors[point.category]++;
+      if (point.forced) state.players[byPlayer(point)].stats.forcedErrors[point.category]++;
+    }
+
+    // Points won add
+    state.players[winner].stats.pointsWon++;
+    if (winner === sIdx) state.players[sIdx].stats.servicePointsWon++;
+    else state.players[1-sIdx].stats.returnPointsWon++;
+
+    // Score advance
+    pointTo(winner);
+
+    finalizePoint(point);
+  }
+
+  function byPlayer(point) { return point.byPlayer; }
+
+  function finalizePoint(point) {
+    // Save to history
+    state.history.push(point);
+
+    // Sync top-level server to UI default (whoever is actually serving next)
+    // (Score logic already rotated server after each game.)
+
+    saveState();
+    renderAll();
+
+    // Show last point summary
+    const n = state.history.length;
+    const pName = state.players[point.winner].name;
+    const cat = point.category.toUpperCase();
+    let sr = point.serve.firstIn ? '1st-in' : (point.serve.secondIn ? '2nd-in' : (point.doubleFault?'DF':'n/a'));
+    document.getElementById('lastPoint').textContent = `#${n}: ${pName} won the point (${point.outcome} – ${cat}; serve: ${sr})${point.comment?` — ${point.comment}`:''}`;
+
+    // Clear comment field only
+    document.querySelector('[name="comment"]').value = '';
+  }
+
+  // ---------- Rendering ----------
+  function renderAll() {
+    // Names
+    document.getElementById('p0name').value = state.players[0].name;
+    document.getElementById('p1name').value = state.players[1].name;
+    document.getElementById('server0lbl').textContent = state.players[0].name;
+    document.getElementById('server1lbl').textContent = state.players[1].name;
+    document.getElementById('pf_server0').textContent = state.players[0].name;
+    document.getElementById('pf_server1').textContent = state.players[1].name;
+
+    document.getElementById('bestOf').value = String(state.settings.bestOf);
+    document.getElementById('tba66').checked = !!state.settings.tiebreakAtSixSix;
+    document.getElementById('finalSetTB').checked = !!state.settings.finalSetTB;
+
+    // Server radio
+    document.getElementById('server0').checked = state.server===0;
+    document.getElementById('server1').checked = state.server===1;
+
+    // Point form default server
+    for (const el of document.querySelectorAll('input[name="pf_server"]')) {
+      el.checked = (+el.value)===state.server;
+    }
+
+    renderScoreboard();
+    renderQuickStats();
+    renderDetailedStats();
+    renderPointLog();
+  }
+
+  function renderScoreboard() {
+    const el = document.getElementById('scoreboard');
+
+    // Build table: header row + player rows
+    const sets = state.sets;
+    const completedSets = sets.length;
+
+    let html = '<table class="min-w-full text-sm">';
+    html += '<thead><tr>';
+    html += '<th class="text-left p-2">Player</th>';
+    for (let i=0;i<sets.length;i++) {
+      html += `<th class="p-2 text-center border-l">Set ${i+1}</th>`;
+    }
+    html += `<th class="p-2 text-center border-l">Game</th>`;
+    const cs = currentSet();
+    if (cs.tiebreak) html += `<th class="p-2 text-center border-l">Tiebreak</th>`;
+    html += '</tr></thead>';
+
+    const row = (idx) => {
+      let r = `<tr class="border-t">`;
+      const isServer = state.server===idx ? ' 🔸' : '';
+      r += `<td class="p-2 font-medium">${state.players[idx].name}${isServer}</td>`;
+      for (let s of sets) {
+        r += `<td class="p-2 text-center border-l">${s.games[idx]}</td>`;
+      }
+      r += `<td class="p-2 text-center border-l">${asScore(state.gamePoints[idx])}</td>`;
+      if (cs.tiebreak) r += `<td class="p-2 text-center border-l">${cs.tbPoints[idx]}</td>`;
+      r += '</tr>';
+      return r;
+    };
+
+    html += '<tbody>' + row(0) + row(1) + '</tbody></table>';
+    el.innerHTML = html;
+
+    const hints = document.getElementById('scoreHints');
+    const sw = setsWonBy();
+    const bo = state.settings.bestOf;
+    const needToWin = Math.floor(bo/2)+1;
+    hints.textContent = `Sets: ${sw[0]}–${sw[1]} (first to ${needToWin}). Server marked with 🔸.`;
+  }
+
+  function renderQuickStats() {
+    const qs = document.getElementById('quickStats');
+    const card = (idx) => {
+      const p = state.players[idx];
+      const fs = p.stats.firstServe;
+      const spw = p.stats.servicePointsWon;
+      const spp = p.stats.servicePointsPlayed;
+      const rpw = p.stats.returnPointsWon;
+      const rpp = p.stats.returnPointsPlayed;
+      const holds = p.stats.serviceGamesHeld;
+      const sGP = p.stats.serviceGamesPlayed;
+      const breaks = p.stats.breaks;
+      return `
+      <div class="rounded-2xl border p-4">
+        <div class="font-semibold mb-1">${p.name}</div>
+        <div class="text-xs text-slate-600 mb-3">Points won: <span class="font-medium">${p.stats.pointsWon}</span></div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div><div class="text-slate-500">1st Serve%</div><div class="font-medium">${pct(fs.in, fs.attempts).toFixed(1)}%</div></div>
+          <div><div class="text-slate-500">Aces</div><div class="font-medium">${p.stats.aces}</div></div>
+          <div><div class="text-slate-500">Double Faults</div><div class="font-medium">${p.stats.doubleFaults}</div></div>
+          <div><div class="text-slate-500">Hold %</div><div class="font-medium">${pct(holds, sGP).toFixed(1)}% (${holds}/${sGP})</div></div>
+          <div><div class="text-slate-500">Srv Pts Won %</div><div class="font-medium">${pct(spw, spp).toFixed(1)}%</div></div>
+          <div><div class="text-slate-500">Ret Pts Won %</div><div class="font-medium">${pct(rpw, rpp).toFixed(1)}%</div></div>
+          <div><div class="text-slate-500">Breaks</div><div class="font-medium">${breaks}</div></div>
+        </div>
+      </div>`;
+    };
+    qs.innerHTML = card(0) + card(1);
+  }
+
+  function renderDetailedStats() {
+    const container = document.getElementById('detailedStats');
+    const block = (idx) => {
+      const p = state.players[idx];
+      const W = p.stats.winners, E = p.stats.errors, F = p.stats.forcedErrors;
+      const netW = W.fhv + W.bhv + W.oh;
+      const netE = E.fhv + E.bhv + E.oh;
+      return `
+      <div class="rounded-2xl border p-4">
+        <div class="font-semibold mb-3">${p.name}</div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <div class="text-slate-500 font-medium mb-1">Winners</div>
+            <ul class="space-y-1">
+              <li>FH: <span class="font-medium">${W.fh}</span></li>
+              <li>BH: <span class="font-medium">${W.bh}</span></li>
+              <li>Serve (aces+SW): <span class="font-medium">${W.serve}</span></li>
+              <li>FHV: <span class="font-medium">${W.fhv}</span></li>
+              <li>BHV: <span class="font-medium">${W.bhv}</span></li>
+              <li>OH: <span class="font-medium">${W.oh}</span></li>
+              <li class="pt-1 border-t">Net winners: <span class="font-medium">${netW}</span></li>
+            </ul>
+          </div>
+          <div>
+            <div class="text-slate-500 font-medium mb-1">Errors</div>
+            <ul class="space-y-1">
+              <li>FH: <span class="font-medium">${E.fh}</span> <span class="text-xs text-slate-500">(forced ${F.fh})</span></li>
+              <li>BH: <span class="font-medium">${E.bh}</span> <span class="text-xs text-slate-500">(forced ${F.bh})</span></li>
+              <li>Serve (incl. DF): <span class="font-medium">${E.serve}</span> <span class="text-xs text-slate-500">(forced ${F.serve})</span></li>
+              <li>FHV: <span class="font-medium">${E.fhv}</span> <span class="text-xs text-slate-500">(forced ${F.fhv})</span></li>
+              <li>BHV: <span class="font-medium">${E.bhv}</span> <span class="text-xs text-slate-500">(forced ${F.bhv})</span></li>
+              <li>OH: <span class="font-medium">${E.oh}</span> <span class="text-xs text-slate-500">(forced ${F.oh})</span></li>
+              <li class="pt-1 border-t">Net errors: <span class="font-medium">${netE}</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>`;
+    };
+    container.innerHTML = block(0) + block(1);
+  }
+
+  function renderPointLog() {
+    const el = document.getElementById('pointLog');
+    const rows = state.history.map((p, i) => {
+      const winner = state.players[p.winner].name;
+      const by = p.outcome==='winner' ? state.players[p.byPlayer].name : state.players[p.byPlayer].name;
+      let serveTxt = p.serve.firstIn? '1st-in' : p.serve.secondIn? '2nd-in' : p.doubleFault? 'DF' : 'n/a';
+      const cat = p.category.toUpperCase();
+      const forced = p.outcome==='error' ? (p.forced? ' (forced)' : ' (unforced)') : '';
+      const c = p.comment? `<div class='text-slate-500 mt-1'>${escapeHtml(p.comment)}</div>` : '';
+      return `<div class="p-3 border rounded-xl">
+        <div class="text-sm"><span class="text-slate-500">#${i+1}</span> <span class="font-medium">${winner}</span> won — ${p.outcome} by ${by} • ${cat} • serve ${serveTxt}${forced}</div>
+        ${c}
+      </div>`;
+    });
+    el.innerHTML = rows.join('');
+  }
+
+  function escapeHtml(str) { return str.replace(/[&<>"]+/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+
+  // ---------- Exports ----------
+  function download(filename, text) {
+    const a = document.createElement('a');
+    a.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+    a.setAttribute('download', filename);
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function exportJSON() { download('tennis_match.json', JSON.stringify(state, null, 2)); }
+
+  function exportCSV() {
+    const lines = [];
+    lines.push(['point','server','firstServeIn','secondServeIn','doubleFault','winner','byPlayer','outcome','category','forced','comment','setIdx','gamesP0','gamesP1','tb','tbP0','tbP1'].join(','));
+    // To reconstruct set/game at time of point, we simulate through history
+    const sim = newMatchState();
+    sim.players[0].name = state.players[0].name; sim.players[1].name = state.players[1].name;
+    sim.settings = deepClone(state.settings);
+    sim.server = state.history.length ? state.history[0].server : state.server;
+
+    for (let i=0;i<state.history.length;i++) {
+      const p = state.history[i];
+      // snapshot before applying point
+      const cs = sim.sets[sim.sets.length-1];
+      lines.push([
+        i+1,
+        sim.players[p.server].name,
+        p.serve.firstIn?1:0,
+        p.serve.secondIn?1:0,
+        p.doubleFault?1:0,
+        state.players[p.winner].name,
+        state.players[p.byPlayer].name,
+        p.outcome,
+        p.category,
+        p.outcome==='error'?(p.forced?1:0):'',
+        '"'+(p.comment||'').replace(/"/g,'""')+'"',
+        sim.sets.length,
+        cs.games[0], cs.games[1],
+        cs.tiebreak?1:0,
+        cs.tbPoints[0], cs.tbPoints[1]
+      ].join(','));
+      // apply to sim
+      applyPointSim(sim, p);
+    }
+    download('tennis_points.csv', lines.join('\n'));
+  }
+
+  function applyPointSim(sim, point) {
+    // minimal version of applyPoint for export simulation
+    sim.players[point.server].stats.firstServe.attempts++;
+    if (point.serve.firstIn) sim.players[point.server].stats.firstServe.in++;
+
+    const winner = point.doubleFault ? (1 - point.server) : point.winner;
+
+    const set = sim.sets[sim.sets.length-1];
+    const pointTo = (playerIdx) => {
+      const opp = 1 - playerIdx;
+      if (set.tiebreak) {
+        set.tbPoints[playerIdx]++;
+        const w = set.tbPoints[playerIdx], l = set.tbPoints[opp];
+        if (w>=7 && (w-l)>=2) {
+          set.games[playerIdx]++;
+          // new set
+          sim.sets.push({ games: [0,0], tiebreak: false, tbPoints: [0,0] });
+        }
+      } else {
+        const w = sim.gamePoints[playerIdx];
+        const l = sim.gamePoints[opp];
+        if (w <= 2) sim.gamePoints[playerIdx]++;
+        else if (w===3 && l<3) {
+          set.games[playerIdx]++;
+          sim.gamePoints=[0,0];
+          sim.server = 1 - sim.server;
+          const gw = set.games[playerIdx], gl = set.games[opp];
+          const needTB = (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
+          if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
+          if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+        } else if (w===3 && l===3) sim.gamePoints[playerIdx]=4;
+        else if (w===4) {
+          set.games[playerIdx]++;
+          sim.gamePoints=[0,0];
+          sim.server = 1 - sim.server;
+          const gw = set.games[playerIdx], gl = set.games[opp];
+          const needTB = (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
+          if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
+          if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+        } else if (l===4) sim.gamePoints[opp]=3;
+      }
+    };
+
+    pointTo(winner);
+  }
+
+  // ---------- Events ----------
+  document.getElementById('btnUndo').addEventListener('click', () => undo());
+  document.getElementById('btnNewMatch').addEventListener('click', () => {
+    if (!confirm('Start a new match and clear current data?')) return;
+    pushUndo();
+    state = newMatchState();
+    saveState();
+    renderAll();
+  });
+
+  document.getElementById('p0name').addEventListener('input', (e)=>{ state.players[0].name=e.target.value; saveState(); renderAll(); });
+  document.getElementById('p1name').addEventListener('input', (e)=>{ state.players[1].name=e.target.value; saveState(); renderAll(); });
+  document.getElementById('bestOf').addEventListener('change', (e)=>{ state.settings.bestOf=+e.target.value; saveState(); renderAll(); });
+  document.getElementById('tba66').addEventListener('change', (e)=>{ state.settings.tiebreakAtSixSix=!!e.target.checked; saveState(); renderAll(); });
+  document.getElementById('finalSetTB').addEventListener('change', (e)=>{ state.settings.finalSetTB=!!e.target.checked; saveState(); renderAll(); });
+  document.getElementById('server0').addEventListener('change', ()=>{ state.server=0; saveState(); renderAll(); });
+  document.getElementById('server1').addEventListener('change', ()=>{ state.server=1; saveState(); renderAll(); });
+
+  document.getElementById('pointForm').addEventListener('change', (e)=>{
+    if (e.target.name==='endType') {
+      document.getElementById('forcedWrap').classList.toggle('hidden', e.target.value!=='error');
+    }
+  });
+
+  document.getElementById('pointForm').addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    recordPoint(fd);
+  });
+
+  document.getElementById('btnClearComment').addEventListener('click', ()=>{
+    document.querySelector('[name="comment"]').value='';
+  });
+
+  document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
+  document.getElementById('btnExportJSON').addEventListener('click', exportJSON);
+  document.getElementById('inputImportJSON').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const txt = await file.text();
+      const obj = JSON.parse(txt);
+      if (!obj || !obj.players || !obj.sets) throw new Error('Invalid file.');
+      pushUndo();
+      state = obj;
+      saveState();
+      renderAll();
+      alert('Import successful.');
+    } catch(err) {
+      alert('Import failed: '+err.message);
+    } finally {
+      e.target.value = '';
+    }
+  });
+
+  // Initial render
+  renderAll();
+  </script>
+</body>
+</html>
