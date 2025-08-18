@@ -47,13 +47,25 @@
             <option value="5">5 sets</option>
           </select>
           <div class="mt-3 flex items-center gap-3 text-sm">
-            <label class="flex items-center gap-2">
+            <label class="flex items-center gap-2" id="wrap_tba66">
               <input id="tba66" type="checkbox" class="accent-slate-800" checked/>
               Tiebreak at 6–6
             </label>
-            <label class="flex items-center gap-2">
+            <label class="flex items-center gap-2" id="wrap_finalSetTB">
               <input id="finalSetTB" type="checkbox" class="accent-slate-800" checked/>
               Final set uses TB
+            </label>
+            <span class="inline-block w-px h-6 bg-slate-200"></span>
+            <label class="flex items-center gap-2">
+              <input id="formatPro" type="checkbox" class="accent-slate-800"/>
+              Pro Set (to 8)
+            </label>
+            <label class="flex items-center gap-2">
+              TB at
+              <select id="proSetTBAt" class="px-2 py-1 rounded-lg border">
+                <option value="7">7–7</option>
+                <option value="8">8–8</option>
+              </select>
             </label>
           </div>
         </div>
@@ -219,7 +231,7 @@
 
   const newMatchState = () => ({
     players: [ { name: 'Player 1', stats: emptyStats() }, { name: 'Player 2', stats: emptyStats() } ],
-    settings: { bestOf: 3, tiebreakAtSixSix: true, finalSetTB: true },
+    settings: { bestOf: 3, tiebreakAtSixSix: true, finalSetTB: true, format: 'standard', proSetTBAt: 7 },
     server: 0, // index of server
     sets: [ { games: [0,0], tiebreak: false, tbPoints: [0,0] } ],
     gamePoints: [0,0], // 0,1,2,3,4(Ad)
@@ -297,6 +309,44 @@
     const w = set.games[playerIdx];
     const l = set.games[1-playerIdx];
 
+    // Pro Set logic: first to 8 by 2, TB at 7–7 or 8–8 (configurable)
+    if (state.settings && state.settings.format === 'pro') {
+      const tbAt = state.settings.proSetTBAt || 7;
+      const needTBPro = (w===tbAt && l===tbAt);
+      if (needTBPro) {
+        set.tiebreak = true;
+        set.tbPoints = [0,0];
+        return;
+      }
+      if (w>=8 && (w-l)>=2) {
+        finishSet(playerIdx, false);
+      }
+      return;
+    }
+
+    // Standard sets logic
+    const needTB = (w===6 && l===6 && state.settings.tiebreakAtSixSix && (state.settings.finalSetTB || (state.sets.length < state.settings.bestOf)));
+    if (needTB) {
+      set.tiebreak = true;
+      set.tbPoints = [0,0];
+      return;
+    }
+
+    if (w>=6 && (w-l)>=2) {
+      finishSet(playerIdx, false);
+    }
+  } else {
+      state.players[returner].stats.breaks++;
+    }
+
+    // Reset game points & rotate server
+    state.gamePoints = [0,0];
+    state.server = 1 - state.server;
+
+    // Set finished?
+    const w = set.games[playerIdx];
+    const l = set.games[1-playerIdx];
+
     const needTB = (w===6 && l===6 && state.settings.tiebreakAtSixSix && (state.settings.finalSetTB || (state.sets.length < state.settings.bestOf)));
     if (needTB) {
       set.tiebreak = true;
@@ -312,11 +362,15 @@
   function finishSet(winnerIdx, viaTB) {
     // Start a new set if match not finished
     const setsWon = setsWonBy();
-    const bestOf = state.settings.bestOf;
-    if (setsWon[winnerIdx] + 1 > Math.floor(bestOf/2)) {
+    const bestOfUsed = (state.settings && state.settings.format==='pro') ? 1 : state.settings.bestOf;
+    if (setsWon[winnerIdx] + 1 > Math.floor(bestOfUsed/2)) {
       // match over; keep final set, no new set created
       // (We still mark the set that just finished)
     } else {
+      state.sets.push({ games: [0,0], tiebreak: false, tbPoints: [0,0] });
+      // In real rules, server for new set depends on parity/tiebreak; we continue rotation.
+    }
+  } else {
       state.sets.push({ games: [0,0], tiebreak: false, tbPoints: [0,0] });
       // In real rules, server for new set depends on parity/tiebreak; we continue rotation.
     }
@@ -438,6 +492,10 @@
 
   // ---------- Rendering ----------
   function renderAll() {
+    // Backward-compatible defaults for new settings
+    if (!state.settings) state.settings = {};
+    if (state.settings.format === undefined) state.settings.format = 'standard';
+    if (state.settings.proSetTBAt === undefined) state.settings.proSetTBAt = 7;
     // Names
     document.getElementById('p0name').value = state.players[0].name;
     document.getElementById('p1name').value = state.players[1].name;
@@ -454,6 +512,13 @@
     document.getElementById('bestOf').value = String(state.settings.bestOf);
     document.getElementById('tba66').checked = !!state.settings.tiebreakAtSixSix;
     document.getElementById('finalSetTB').checked = !!state.settings.finalSetTB;
+
+    // Pro Set controls
+    const formatProEl = document.getElementById('formatPro');
+    const proTBEl = document.getElementById('proSetTBAt');
+    if (formatProEl) formatProEl.checked = state.settings.format==='pro';
+    if (proTBEl) proTBEl.value = String(state.settings.proSetTBAt || 7);
+    updateFormatUI();
 
     // Server radio
     document.getElementById('server0').checked = state.server===0;
@@ -507,9 +572,14 @@
 
     const hints = document.getElementById('scoreHints');
     const sw = setsWonBy();
-    const bo = state.settings.bestOf;
-    const needToWin = Math.floor(bo/2)+1;
-    hints.textContent = `Sets: ${sw[0]}–${sw[1]} (first to ${needToWin}). Server marked with 🔸.`;
+    if (state.settings && state.settings.format==='pro') {
+      const tbAt = state.settings.proSetTBAt || 7;
+      hints.textContent = `Pro set to 8 (TB at ${tbAt}–${tbAt}). Server marked with 🔸.`;
+    } else {
+      const bo = state.settings.bestOf;
+      const needToWin = Math.floor(bo/2)+1;
+      hints.textContent = `Sets: ${sw[0]}–${sw[1]} (first to ${needToWin}). Server marked with 🔸.`;
+    }
   }
 
   function renderQuickStats() {
@@ -623,6 +693,22 @@
     }
   }
 
+  function updateFormatUI() {
+    const isPro = state.settings && state.settings.format==='pro';
+    const bestOfEl = document.getElementById('bestOf');
+    const tba = document.getElementById('tba66');
+    const finalTB = document.getElementById('finalSetTB');
+    const wrapTba = document.getElementById('wrap_tba66');
+    const wrapFinal = document.getElementById('wrap_finalSetTB');
+    const proTB = document.getElementById('proSetTBAt');
+
+    if (bestOfEl) { bestOfEl.disabled = isPro; bestOfEl.classList.toggle('opacity-50', isPro); }
+    [tba, finalTB].forEach(el => { if (el){ el.disabled = isPro; el.classList.toggle('opacity-50', isPro);} });
+    [wrapTba, wrapFinal].forEach(el => { if (el) el.classList.toggle('opacity-50', isPro); });
+
+    if (proTB) { proTB.disabled = !isPro; proTB.classList.toggle('opacity-50', !isPro); }
+  }
+
   // ---------- Exports ----------
   function download(filename, text) {
     const a = document.createElement('a');
@@ -699,6 +785,43 @@
           sim.gamePoints=[0,0];
           sim.server = 1 - sim.server;
           const gw = set.games[playerIdx], gl = set.games[opp];
+          const isPro = sim.settings && sim.settings.format==='pro';
+          const needTB = isPro ? (gw===(sim.settings.proSetTBAt||7) && gl===(sim.settings.proSetTBAt||7)) : (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
+          if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
+          if (isPro) {
+            if (gw>=8 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+          } else {
+            if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+          }
+        } else if (w===3 && l===3) sim.gamePoints[playerIdx]=4;
+        else if (w===4) {
+          set.games[playerIdx]++;
+          sim.gamePoints=[0,0];
+          sim.server = 1 - sim.server;
+          const gw = set.games[playerIdx], gl = set.games[opp];
+          const isPro = sim.settings && sim.settings.format==='pro';
+          const needTB = isPro ? (gw===(sim.settings.proSetTBAt||7) && gl===(sim.settings.proSetTBAt||7)) : (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
+          if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
+          if (isPro) {
+            if (gw>=8 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+          } else {
+            if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+          }
+        } else if (l===4) sim.gamePoints[opp]=3;
+      }
+    };
+
+    pointTo(winner);
+  }
+      } else {
+        const w = sim.gamePoints[playerIdx];
+        const l = sim.gamePoints[opp];
+        if (w <= 2) sim.gamePoints[playerIdx]++;
+        else if (w===3 && l<3) {
+          set.games[playerIdx]++;
+          sim.gamePoints=[0,0];
+          sim.server = 1 - sim.server;
+          const gw = set.games[playerIdx], gl = set.games[opp];
           const needTB = (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
           if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
           if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
@@ -730,7 +853,11 @@
 
   document.getElementById('p0name').addEventListener('input', (e)=>{ state.players[0].name=e.target.value; saveState(); renderAll(); });
   document.getElementById('p1name').addEventListener('input', (e)=>{ state.players[1].name=e.target.value; saveState(); renderAll(); });
-  document.getElementById('bestOf').addEventListener('change', (e)=>{ state.settings.bestOf=+e.target.value; saveState(); renderAll(); });
+  document.getElementById('bestOf').addEventListener('change', (e)=>{
+    state.settings.bestOf=+e.target.value;
+    state.settings.format='standard';
+    saveState(); renderAll();
+  });
   document.getElementById('tba66').addEventListener('change', (e)=>{ state.settings.tiebreakAtSixSix=!!e.target.checked; saveState(); renderAll(); });
   document.getElementById('finalSetTB').addEventListener('change', (e)=>{ state.settings.finalSetTB=!!e.target.checked; saveState(); renderAll(); });
   document.getElementById('server0').addEventListener('change', ()=>{ state.server=0; saveState(); renderAll(); });
@@ -755,6 +882,16 @@
 
   document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
   document.getElementById('btnExportJSON').addEventListener('click', exportJSON);
+  // Pro set events
+  document.getElementById('formatPro').addEventListener('change', (e)=>{
+    state.settings.format = e.target.checked ? 'pro' : 'standard';
+    saveState();
+    renderAll();
+  });
+  document.getElementById('proSetTBAt').addEventListener('change', (e)=>{
+    state.settings.proSetTBAt = +e.target.value || 7;
+    saveState();
+  });
   document.getElementById('inputImportJSON').addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     if (!file) return;
