@@ -200,22 +200,24 @@
   let undoStack = [];
 
   const emptyStats = () => ({
-    firstServe: {attempts:0, in:0},
-    aces: 0,
-    doubleFaults: 0,
-    winners: { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
-    errors:  { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
-    forcedErrors:  { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
-    pointsWon: 0,
-    servicePointsWon: 0,
-    servicePointsPlayed: 0,
-    returnPointsWon: 0,
-    returnPointsPlayed: 0,
-    serviceGamesPlayed: 0,
-    serviceGamesHeld: 0,
-    returnGamesPlayed: 0,
-    breaks: 0,
-  });
+  firstServe: {attempts:0, in:0},
+  aces: 0,
+  doubleFaults: 0,
+  winners: { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
+  errors:  { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
+  forcedErrors:  { fh:0, bh:0, serve:0, fhv:0, bhv:0, oh:0 },
+  pointsWon: 0,
+  servicePointsWon: 0,
+  servicePointsPlayed: 0,
+  returnPointsWon: 0,
+  returnPointsPlayed: 0,
+  serviceGamesPlayed: 0,
+  serviceGamesHeld: 0,
+  returnGamesPlayed: 0,
+  breaks: 0,
+  breakPoints: { opportunities: 0, converted: 0, faced: 0, saved: 0 },
+});
+
 
   const newMatchState = () => ({
     players: [ { name: 'Player 1', stats: emptyStats() }, { name: 'Player 2', stats: emptyStats() } ],
@@ -244,6 +246,27 @@
 
   // ---------- Scoring Logic ----------
   function currentSet() { return state.sets[state.sets.length-1]; }
+
+  // Break point if the returner can win the game on this point (non-tiebreak)
+function isBreakPointNow() {
+  const set = currentSet();
+  if (set.tiebreak) return false;
+  const s = state.server, r = 1 - s;
+  const g = state.gamePoints; // 0,1,2,3,4 => 0,15,30,40,Ad
+  return ( (g[r] === 3 && g[s] <= 2) || (g[r] === 4) );
+}
+
+
+  // Break point if the returner can win the game on this point (non-tiebreak)
+  function isBreakPointNow() {
+    const set = currentSet();
+     if (set.tiebreak) return false;
+    const s = state.server, r = 1 - s;
+    const g = state.gamePoints; // 0,1,2,3,4 => 0,15,30,40,Ad
+    return ( (g[r] === 3 && g[s] <= 2) || (g[r] === 4) );
+    }
+
+
 
   function pointTo(playerIdx) {
     const opp = 1 - playerIdx;
@@ -339,6 +362,8 @@
     const byPlayer = +formData.get('byPlayer');
     const category = formData.get('category'); // fh,bh,serve,fhv,bhv,oh
     const comment = (formData.get('comment')||'').trim();
+    const wasBreak = isBreakPointNow();
+
 
     const point = {
       server,
@@ -346,6 +371,7 @@
       outcome: endType,
       byPlayer,
       category,
+      breakPoint: wasBreak,
       forced: endType==='error' ? !!formData.get('forced') : false,
       comment,
       timestamp: Date.now()
@@ -370,6 +396,14 @@
 
     // Update first-serve stats for server
     const sIdx = point.server;
+    const rIdx = 1 - sIdx;
+    const bpNow = point.breakPoint || isBreakPointNow();
+    if (bpNow) {
+        // Opportunity for returner; server faces one
+        state.players[rIdx].stats.breakPoints.opportunities++;
+        state.players[sIdx].stats.breakPoints.faced++;
+    }
+
     state.players[sIdx].stats.firstServe.attempts++;
     if (point.serve.firstIn) state.players[sIdx].stats.firstServe.in++;
 
@@ -380,6 +414,12 @@
     // Aces / DFs / winners / errors
     const winner = point.winner;
     const loser = 1 - winner;
+
+    // Count converted/saved immediately (covers DF and normal points)
+    if (bpNow) {
+        if (winner === rIdx) state.players[rIdx].stats.breakPoints.converted++;
+        else state.players[sIdx].stats.breakPoints.saved++;
+    }
 
     if (point.doubleFault) {
       state.players[sIdx].stats.doubleFaults++;
@@ -518,6 +558,10 @@
       const holds = p.stats.serviceGamesHeld;
       const sGP = p.stats.serviceGamesPlayed;
       const breaks = p.stats.breaks;
+      const bp = p.stats.breakPoints || { opportunities:0, converted:0, faced:0, saved:0 };
+      const bpConvRate = pct(bp.converted, bp.opportunities).toFixed(1) + '%';
+      const bpSavedRate = pct(bp.saved, bp.faced).toFixed(1) + '%';
+
       return `
       <div class="rounded-2xl border p-4">
         <div class="font-semibold mb-1">${p.name}</div>
@@ -530,6 +574,9 @@
           <div><div class="text-slate-500">Srv Pts Won %</div><div class="font-medium">${pct(spw, spp).toFixed(1)}%</div></div>
           <div><div class="text-slate-500">Ret Pts Won %</div><div class="font-medium">${pct(rpw, rpp).toFixed(1)}%</div></div>
           <div><div class="text-slate-500">Breaks</div><div class="font-medium">${breaks}</div></div>
+          <div><div class="text-slate-500">BP Conv</div><div class="font-medium">${bp.converted}/${bp.opportunities} (${bpConvRate})</div></div>
+          <div><div class="text-slate-500">BP Saved</div><div class="font-medium">${bp.saved}/${bp.faced} (${bpSavedRate})</div></div>
+
         </div>
       </div>`;
     };
@@ -585,10 +632,10 @@
       let serveTxt = p.serve.firstIn? '1st-in' : p.serve.secondIn? '2nd-in' : p.doubleFault? 'DF' : 'n/a';
       const cat = p.category.toUpperCase();
       const forced = p.outcome==='error' ? (p.forced? ' (forced)' : ' (unforced)') : '';
+      const bpTag = p.breakPoint ? ' • BP' : '';
       const c = p.comment? `<div class='text-slate-500 mt-1'>${escapeHtml(p.comment)}</div>` : '';
       return `<div class="p-3 border rounded-xl">
-        <div class="text-sm"><span class="text-slate-500">#${i+1}</span> <span class="font-medium">${winner}</span> won — ${p.outcome} by ${by} • ${cat} • serve ${serveTxt}${forced}</div>
-        ${c}
+        <div class="text-sm"><span class="text-slate-500">#${i+1}</span> <span class="font-medium">${winner}</span> won — ${p.outcome} by ${by} • ${cat} • sserve ${serveTxt}${forced}${bpTag}</div>
       </div>`;
     });
     el.innerHTML = rows.join('');
@@ -611,7 +658,7 @@
 
   function exportCSV() {
     const lines = [];
-    lines.push(['point','server','firstServeIn','secondServeIn','doubleFault','winner','byPlayer','outcome','category','forced','comment','setIdx','gamesP0','gamesP1','tb','tbP0','tbP1'].join(','));
+    lines.push(['point','server','firstServeIn','secondServeIn','doubleFault','winner','byPlayer','outcome','category','forced','breakPoint','comment','setIdx','gamesP0','gamesP1','tb','tbP0','tbP1'].join(','));
     // To reconstruct set/game at time of point, we simulate through history
     const sim = newMatchState();
     sim.players[0].name = state.players[0].name; sim.players[1].name = state.players[1].name;
