@@ -9,9 +9,9 @@
   body { background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; touch-action: none; }
   #game { display:block; width:100vw; height:100vh; outline:none; position:relative; z-index:0; }
   /* HUD */
-  .hud { position:fixed; top:8px; left:8px; right:8px; display:flex; gap:8px; align-items:center; justify-content:flex-start; pointer-events:none; z-index:9999; }
-  .pill { background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.15); border-radius:12px; padding:6px 10px; font-size:14px; pointer-events:auto; }
-  .center { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10000; }
+  .hud { position:fixed; top:8px; left:8px; right:8px; display:flex; gap:8px; align-items:center; justify-content:flex-start; pointer-events:none; z-index:2147483646; }
+  .pill { background:rgba(20,20,20,.6); border:1px solid rgba(255,255,255,.25); border-radius:12px; padding:6px 10px; font-size:14px; pointer-events:auto; text-shadow:0 2px 4px rgba(0,0,0,.6); }
+  .center { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:2147483647; }
   .overlay { background:rgba(0,0,0,.6); padding:16px 20px; border:1px solid rgba(255,255,255,.15); border-radius:14px; max-width: min(92vw, 640px); text-align:center; }
   .overlay h1 { margin:0 0 6px; font-size:20px; }
   .overlay p { margin:8px 0; color:#ddd; font-size:14px; }
@@ -22,7 +22,7 @@
   .btn-mini:hover { background:rgba(255,255,255,.2); }
 
   /* Mobile controls */
-  .controls { position:fixed; bottom:16px; left:16px; right:16px; display:flex; justify-content:space-between; gap:12px; pointer-events:none; z-index:9998; }
+  .controls { position:fixed; bottom:16px; left:16px; right:16px; display:flex; justify-content:space-between; gap:12px; pointer-events:none; z-index:2147483645; }
   .cluster { display:flex; gap:12px; pointer-events:auto; }
   .ctrl { width:64px; height:64px; border-radius:16px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:none; }
   .ctrl:active { background:rgba(255,255,255,.16); }
@@ -313,6 +313,7 @@
 
   function start(){
     applyControlMode();
+    ensureHUDOnTop();
     try { canvas.focus(); } catch(e){}
     setTimeout(function(){ try{ canvas.focus(); }catch(e){} }, 0);
 
@@ -320,6 +321,7 @@
     var p=document.getElementById('pauseBtn'); if (p && !p._bound){ p._bound=true; p.addEventListener('click', function(){ paused ? resumeGame() : pauseGame(); }); }
     var q=document.getElementById('quitBtn'); if (q && !q._bound){ q._bound=true; q.addEventListener('click', function(){ quitToStart(); }); }
     updatePauseBtnLabel();
+    var hudEl = document.querySelector('.hud'); if (hudEl) hudEl.style.display='flex';
 
     score=0; lives=3; level=1; spawnLevel(); running=true; paused=false; step.last=performance.now(); requestAnimationFrame(step);
   }
@@ -331,6 +333,18 @@
 
   // If embedded in Playground wrapper, ensure transparent background
   setTimeout(function(){ var rr=document.getElementById('rr-container'); if (rr) rr.style.background='transparent'; }, 400);
+
+  // Ensure HUD stays on top (defensive against parent stacking contexts)
+  function ensureHUDOnTop(){
+    var hud = document.querySelector('.hud');
+    if (!hud) return;
+    hud.style.position = 'fixed';
+    hud.style.zIndex = '2147483646';
+    try { document.body.appendChild(hud); } catch(e){}
+  }
+  ensureHUDOnTop();
+  window.addEventListener('resize', ensureHUDOnTop);
+  document.addEventListener('visibilitychange', ensureHUDOnTop);
 })();
 </script>
 </body>
