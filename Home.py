@@ -166,9 +166,6 @@ def link_button_like(label: str, url: str):
 # --------------------------
 #     HEADER / HERO
 # --------------------------
-# --------------------------
-#     HEADER / HERO
-# --------------------------
 left, right = st.columns([3, 1])
 with left:
     st.markdown("<h1 class='hero-title'>Marcos Ondruska</h1>", unsafe_allow_html=True)
