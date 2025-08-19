@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>Asteroids</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; }
+  body { background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; touch-action: none; }
+  #game { display:block; width:100vw; height:100vh; }
+  /* HUD */
+  .hud { position:fixed; top:8px; left:8px; right:8px; display:flex; justify-content:space-between; pointer-events:none; }
+  .pill { background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.15); border-radius:12px; padding:6px 10px; font-size:14px; }
+  .center { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  .overlay { background:rgba(0,0,0,.6); padding:16px 20px; border:1px solid rgba(255,255,255,.15); border-radius:14px; max-width: min(92vw, 600px); text-align:center; }
+  .overlay h1 { margin:0 0 6px; font-size:20px; }
+  .overlay p { margin:8px 0; color:#ddd; font-size:14px; }
+  .overlay kbd { background:#222; border:1px solid #444; border-radius:6px; padding:2px 6px; font-size:12px; }
+  .btn { display:inline-block; margin-top:10px; background:#0ea5e9; color:#001018; border:none; border-radius:10px; padding:10px 14px; font-weight:600; font-size:14px; cursor:pointer; }
+  .btn:active { transform: translateY(1px); }
+
+  /* Mobile controls */
+  .controls { position:fixed; bottom:16px; left:16px; right:16px; display:flex; justify-content:space-between; gap:12px; pointer-events:none; }
+  .cluster { display:flex; gap:12px; pointer-events:auto; }
+  .ctrl { width:64px; height:64px; border-radius:16px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:none; }
+  .ctrl:active { background:rgba(255,255,255,.16); }
+  .ctrl span { opacity:.9; font-size:16px; }
+  @media (min-width: 900px) {
+    .ctrl { width:56px; height:56px; }
+  }
+  /* If embedded in a wrapper (your Playground injects #rr-container), force it transparent */
+  #rr-container { background: transparent !important; box-shadow:none !important; padding:0 !important; margin:0 !important; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud">
+  <div class="pill" id="scoreHUD">Score: 0</div>
+  <div class="pill" id="livesHUD">Lives: 3</div>
+  $1
+  <div class="pill">Controls:
+    <select id="controlModeSel" style="margin-left:6px; background:rgba(0,0,0,.35); color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:8px; padding:2px 6px;">
+      <option value="auto">Auto</option>
+      <option value="touch">Touch</option>
+      <option value="keyboard">Keyboard</option>
+    </select>
+  </div>
+</div>
+<div id="startOverlay" class="center">
+  <div class="overlay">
+    <h1>Asteroids</h1>
+    <p>PC: <kbd>←</kbd> <kbd>→</kbd> rotate • <kbd>↑</kbd> thrust • <kbd>Space</kbd> fire • <kbd>H</kbd> hyperspace • <kbd>P</kbd> pause</p>
+    $1
+    <p>Use the Controls selector (Auto/Touch/Keyboard) to switch input.</p>
+    <button class="btn" id="startBtn">Tap to Start</button>
+  </div>
+</div>
+<div class="controls" id="controls" style="display:none;">
+  <div class="cluster">
+    <div class="ctrl" data-act="left"><span>⟲</span></div>
+    <div class="ctrl" data-act="right"><span>⟳</span></div>
+    <div class="ctrl" data-act="thrust"><span>↑</span></div>
+  </div>
+  <div class="cluster">
+    <div class="ctrl" data-act="fire"><span>●</span></div>
+    <div class="ctrl" data-act="hyper"><span>✦</span></div>
+    <div class="ctrl" data-act="pause"><span>⏸</span></div>
+  </div>
+</div>
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+  // Fit canvas
+  function resize(){
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width = Math.floor(w * DPR);
+    canvas.height = Math.floor(h * DPR);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Game state
+  const TAU = Math.PI * 2;
+  let running = false, paused = false;
+  let score = 0, lives = 3, level = 1;
+  const bullets = [], rocks = [];
+  let ship;
+
+  $1
+
+  // Control mode: 'auto' (default), 'touch', or 'keyboard'
+  const isTouchCapable = 'ontouchstart' in window || navigator.maxTouchPoints>0;
+  let controlMode = localStorage.getItem('asteroidsControlMode') || 'auto';
+  function computeShowTouch(){ return controlMode==='touch' || (controlMode==='auto' && isTouchCapable); }
+  function applyControlMode(){
+    const show = computeShowTouch();
+    const controlsEl = document.getElementById('controls');
+    if (controlsEl) controlsEl.style.display = show ? 'flex' : 'none';
+    const sel = document.getElementById('controlModeSel');
+    if (sel && sel.value !== controlMode) sel.value = controlMode;
+  }
+
+  // Inputs
+  const keys = { left:false, right:false, thrust:false, fire:false, hyper:false };
+  function setKey(k, v){ keys[k]=v; }
+  function keyHandler(e, down){
+    const k = e.key.toLowerCase();
+    if (k==='arrowleft' || k==='left') { setKey('left', down); e.preventDefault(); }
+    if (k==='arrowright' || k==='right') { setKey('right', down); e.preventDefault(); }
+    if (k==='arrowup' || k==='up') { setKey('thrust', down); e.preventDefault(); }
+    if (k===' ' || k==='space') { setKey('fire', down); e.preventDefault(); }
+    if (k==='h') { setKey('hyper', down); e.preventDefault(); }
+    if (k==='p' && down) { paused = !paused; }
+  }
+  window.addEventListener('keydown', e=>keyHandler(e,true), {passive:false});
+  window.addEventListener('keyup', e=>keyHandler(e,false), {passive:false});
+
+  // Touch controls
+  const controls = document.getElementById('controls');
+  const activeTouches = new Set();
+  function bindControl(el, act){
+    const on = ()=>{ setKey(act,true); activeTouches.add(el); };
+    const off = ()=>{ setKey(act,false); activeTouches.delete(el); };
+    el.addEventListener('pointerdown', e=>{ e.preventDefault(); el.setPointerCapture(e.pointerId); on(); });
+    el.addEventListener('pointerup', e=>{ off(); });
+    el.addEventListener('pointercancel', e=>{ off(); });
+    el.addEventListener('pointerleave', e=>{ off(); });
+  }
+  document.querySelectorAll('.ctrl').forEach(el=> bindControl(el, el.getAttribute('data-act')));
+
+  // Bind control mode selector
+  (function(){
+    const sel = document.getElementById('controlModeSel');
+    if (sel){
+      sel.value = controlMode;
+      sel.addEventListener('change', (e)=>{
+        controlMode = e.target.value || 'auto';
+        try { localStorage.setItem('asteroidsControlMode', controlMode); } catch(e){}
+        applyControlMode();
+      });
+    }
+    applyControlMode();
+  })();
+
+  // Entities
+  function wrap(p){
+    if (p.x < 0) p.x += canvas.width/DPR; else if (p.x > canvas.width/DPR) p.x -= canvas.width/DPR;
+    if (p.y < 0) p.y += canvas.height/DPR; else if (p.y > canvas.height/DPR) p.y -= canvas.height/DPR;
+  }
+  function rand(min,max){ return Math.random()*(max-min)+min; }
+  function dist2(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return dx*dx+dy*dy; }
+
+  class Ship{
+    constructor(){
+      this.x = canvas.width/(2*DPR); this.y = canvas.height/(2*DPR);
+      this.a = -Math.PI/2; // facing up
+      this.vx=0; this.vy=0; this.spin=0;
+      this.thrusting=false; this.cool=0; this.inv=1200; // ms of invulnerability
+      this.r = 14; // radius
+    }
+    update(dt){
+      const ACC=180, FRI=0.995, MAXS=480, ROT=4.4;
+      this.spin = (keys.left?-ROT:0) + (keys.right?ROT:0);
+      this.a += this.spin*dt;
+      if (keys.thrust){
+        this.vx += Math.cos(this.a)*ACC*dt;
+        this.vy += Math.sin(this.a)*ACC*dt;
+        this.thrusting = true;
+      } else this.thrusting=false;
+      // clamp speed
+      const s = Math.hypot(this.vx,this.vy);
+      if (s>MAXS){ const k=MAXS/s; this.vx*=k; this.vy*=k; }
+      this.vx*=FRI; this.vy*=FRI;
+      this.x += this.vx*dt; this.y += this.vy*dt; wrap(this);
+      if (this.cool>0) this.cool-=dt*1000;
+      if (this.inv>0) this.inv-=dt*1000;
+      if (keys.fire) this.shoot();
+      if (keys.hyper){ this.hyper(); keys.hyper=false; }
+    }
+    shoot(){
+      if (this.cool>0) return; this.cool=170;
+      const spd=560; const bx=this.x+Math.cos(this.a)*this.r; const by=this.y+Math.sin(this.a)*this.r;
+      bullets.push({ x:bx, y:by, vx:Math.cos(this.a)*spd+this.vx, vy:Math.sin(this.a)*spd+this.vy, t:0, r:2 });
+    }
+    hyper(){
+      // teleport to a random safe-ish spot
+      for (let i=0;i<30;i++){
+        const nx = rand(30, canvas.width/DPR-30), ny = rand(30, canvas.height/DPR-30);
+        let safe = true;
+        for (const r of rocks){ if (dist2({x:nx,y:ny}, r) < (r.r+40)*(r.r+40)) { safe=false; break; } }
+        if (safe){ this.x=nx; this.y=ny; this.vx=this.vy=0; this.inv=800; return; }
+      }
+    }
+    draw(){
+      ctx.save();
+      ctx.translate(this.x,this.y); ctx.rotate(this.a);
+      const blink = (this.inv>0 && Math.floor(this.inv/100)%2===0);
+      ctx.strokeStyle = blink? 'rgba(255,255,255,.4)':'#fff';
+      ctx.lineWidth=2; ctx.beginPath();
+      ctx.moveTo(16,0); ctx.lineTo(-12,-10); ctx.lineTo(-8,-6); ctx.moveTo(-12,10); ctx.lineTo(16,0); ctx.stroke();
+      if (this.thrusting){ ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(-22,4); ctx.lineTo(-16,0); ctx.lineTo(-22,-4); ctx.closePath(); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+
+  class Rock{
+    constructor(x,y,r){ this.x=x; this.y=y; this.vx=rand(-60,60); this.vy=rand(-60,60); this.a=rand(0,TAU); this.va=rand(-1,1); this.r=r; this.shape=this.makeShape(); }
+    makeShape(){ const pts=[]; const n=rand(7,11)|0; for(let i=0;i<n;i++){ const ang=i/n*TAU; const rad=this.r*rand(0.7,1.1); pts.push({ang, rad}); } return pts; }
+    update(dt){ this.x+=this.vx*dt; this.y+=this.vy*dt; this.a+=this.va*dt; wrap(this); }
+    draw(){ ctx.save(); ctx.translate(this.x,this.y); ctx.rotate(this.a); ctx.strokeStyle='#ddd'; ctx.lineWidth=2; ctx.beginPath();
+      for (let i=0;i<this.shape.length;i++){ const p=this.shape[i]; const x=Math.cos(p.ang)*p.rad; const y=Math.sin(p.ang)*p.rad; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.closePath(); ctx.stroke(); ctx.restore(); }
+  }
+
+  function spawnLevel(){
+    rocks.length=0; bullets.length=0; ship = new Ship();
+    const N = Math.min(4+level, 10);
+    for(let i=0;i<N;i++){
+      let x=rand(0, canvas.width/DPR), y=rand(0, canvas.height/DPR);
+      if (Math.hypot(x-ship.x, y-ship.y) < 140) { i--; continue; }
+      rocks.push(new Rock(x,y, rand(24,42)));
+    }
+  }
+
+  function splitRock(r){
+    if (r.r < 18) return [];
+    const r1 = new Rock(r.x, r.y, r.r*0.6);
+    const r2 = new Rock(r.x, r.y, r.r*0.5);
+    return [r1,r2];
+  }
+
+  function collide(){
+    // bullets vs rocks
+    for (let i=bullets.length-1;i>=0;i--){ const b=bullets[i];
+      for (let j=rocks.length-1;j>=0;j--){ const r=rocks[j];
+        if (dist2(b,r) < (r.r+b.r)*(r.r+b.r)){
+          bullets.splice(i,1); rocks.splice(j,1);
+          score += 10; const kids = splitRock(r); for (const k of kids) rocks.push(k);
+          break;
+        }
+      }
+    }
+    // ship vs rocks
+    if (ship.inv<=0){
+      for (let j=rocks.length-1;j>=0;j--){ const r=rocks[j];
+        if (dist2(ship,r) < (r.r+ship.r)*(r.r+ship.r)){
+          lives--; ship = new Ship(); if (lives<0){ gameOver(); } break; }
+      }
+    }
+  }
+
+  function gameOver(){
+    running=false; paused=false;
+    showOverlay('Game Over', `Score: ${score}`, 'Play Again');
+  }
+
+  function nextLevel(){ level++; spawnLevel(); }
+
+  function step(ms){
+    if (!running){ requestAnimationFrame(step); return; }
+    if (paused){ draw(); requestAnimationFrame(step); return; }
+    const now = performance.now(); step.last = step.last || now; const dt = Math.min(0.033, (now - step.last)/1000); step.last = now;
+
+    ship.update(dt);
+    for (const r of rocks) r.update(dt);
+    for (let i=bullets.length-1;i>=0;i--){ const b=bullets[i]; b.x+=b.vx*dt; b.y+=b.vy*dt; wrap(b); b.t+=dt; if (b.t>1.1) bullets.splice(i,1); }
+
+    collide();
+
+    if (rocks.length===0) nextLevel();
+
+    draw();
+    requestAnimationFrame(step);
+  }
+
+  function draw(){
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width/DPR, canvas.height/DPR);
+    for (const r of rocks) r.draw();
+    for (const b of bullets){ ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,TAU); ctx.fillStyle='#9ae6b4'; ctx.fill(); }
+    ship.draw();
+
+    HUD.score.textContent = 'Score: ' + score;
+    HUD.lives.textContent = 'Lives: ' + Math.max(0,lives);
+    HUD.level.textContent = 'Level: ' + level;
+  }
+
+  function showOverlay(title,msg,btn){
+    const ov = document.getElementById('startOverlay');
+    ov.innerHTML = `<div class="overlay"><h1>${title}</h1><p>${msg}</p><button class="btn" id="startBtn">${btn}</button></div>`;
+    ov.style.display='flex';
+    const sbtn = document.getElementById('startBtn');
+    sbtn.onclick = ()=>{ ov.style.display='none'; start(); };
+  }
+
+  function start(){
+    // Control mode (Auto/Touch/Keyboard)
+    applyControlMode();
+    score=0; lives=3; level=1; spawnLevel(); running=true; paused=false; step.last=performance.now(); requestAnimationFrame(step);
+  }
+
+  // Initial overlay
+  document.getElementById('startBtn').onclick = ()=>{ document.getElementById('startOverlay').style.display='none'; start(); };
+
+  // If embedded in Playground wrapper, ensure transparent background
+  (function fixWrapper(){ setTimeout(()=>{ const rr=document.getElementById('rr-container'); if (rr) rr.style.background='transparent'; }, 400); })();
+})();
+</script>
+</body>
+</html>
