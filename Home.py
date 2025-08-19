@@ -174,7 +174,7 @@ with left:
     st.markdown("<h1 class='hero-title'>Marcos Ondruska</h1>", unsafe_allow_html=True)
     st.markdown(
         "<div class='hero-sub'>Ex-ATP #27 • Olympian (Atlanta 1996) • Former South Africa Davis Cup Captain • "
-        "GPTCA A* Certified Coach • Software Developer (ML/Trading, Spring Boot, MERN)</div>",
+        "GPTCA A*, USTA High Performance Certified Coach • Software Developer (ML/Trading, Spring Boot, MERN)</div>",
         unsafe_allow_html=True
     )
     btn_cols = st.columns([1,1,1])  # only 3 columns now
