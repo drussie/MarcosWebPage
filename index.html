@@ -20,22 +20,7 @@
     <h1 class="title">Apps</h1>
     <p class="muted">Quick tools I use personally.</p>
 
-    <section class="grid">
-      <a class="card card-link" href="/apps/car_loan_calculator.html">
-        <div class="card-title">Car Loan Calculator</div>
-        <div class="card-desc">Monthly payment & amortization.</div>
-      </a>
-
-      <a class="card card-link" href="/apps/mortgage_calculator.html">
-        <div class="card-title">Mortgage Calculator</div>
-        <div class="card-desc">All-in (P&I, taxes, insurance, HOA).</div>
-      </a>
-
-      <a class="card card-link" href="/apps/round_robin.html">
-        <div class="card-title">Round Robin (Tennis)</div>
-        <div class="card-desc">Schedule, scores, standings. Saves locally.</div>
-      </a>
-    </section>
+    <section id="appGrid" class="grid"></section>
   </main>
 
   <footer class="site-footer">
@@ -44,5 +29,40 @@
   </footer>
 
   <script type="module" src="/assets/site.js"></script>
+  <script type="module">
+    const grid = document.getElementById('appGrid');
+
+    async function loadApps() {
+      try {
+        const res = await fetch('/apps/apps.json', { cache: 'no-cache' });
+        if (!res.ok) throw new Error('apps.json not found');
+        const apps = await res.json();
+
+        grid.innerHTML = apps.map(a => `
+          <a class="card card-link" href="${a.href}">
+            <div class="card-title">${a.title}</div>
+            <div class="card-desc">${a.desc || ''}</div>
+          </a>
+        `).join('');
+      } catch {
+        // Fallback: show the original 3 if apps.json missing
+        grid.innerHTML = `
+          <a class="card card-link" href="/apps/car_loan_calculator.html">
+            <div class="card-title">Car Loan Calculator</div>
+            <div class="card-desc">Monthly & amortization.</div>
+          </a>
+          <a class="card card-link" href="/apps/mortgage_calculator.html">
+            <div class="card-title">Mortgage Calculator</div>
+            <div class="card-desc">All‑in (P&I, tax, ins, HOA).</div>
+          </a>
+          <a class="card card-link" href="/apps/round_robin.html">
+            <div class="card-title">Round Robin (Tennis)</div>
+            <div class="card-desc">Schedule, scores, standings.</div>
+          </a>`;
+      }
+    }
+
+    loadApps();
+  </script>
 </body>
 </html>
