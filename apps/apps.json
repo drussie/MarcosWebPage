@@ -1,7 +1,7 @@
 [
   { "title": "Car Loan Calculator", "desc": "Monthly & amortization.", "href": "/apps/car_loan_calculator.html" },
   { "title": "Mortgage Calculator", "desc": "All‑in (P&I, tax, ins, HOA).", "href": "/apps/mortgage_calculator.html" },
-  { "title": "Round Robin (Tennis)", "desc": "Schedule, scores, standings.", "href": "/apps/round_robin.html" },
+  { "title": "Round Robin", "desc": "Schedule, scores, standings.", "href": "/apps/round_robin.html" },
   { "title": "Tennis Stats tracker", "desc": "Keeps track of basic stats in matches", "href": "/apps/tennis_tracker.html" },
-  { "title": "Asteroids", "desc": "Classic old school Asteroids, enjoy!", "href": "/apps/asteroids.html" }
+  { "title": "Asteroids", "desc": "Classic old school Asteroids. Enjoy!", "href": "/apps/asteroids.html" }
 ]
