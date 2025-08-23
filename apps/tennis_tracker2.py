@@ -7,6 +7,7 @@
   <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    /* Fallback utility if Tailwind fails */
     .shadow-soft { box-shadow: 0 8px 30px rgba(0,0,0,.08); }
     .grid-auto { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: .75rem; }
   </style>
@@ -40,31 +41,12 @@
           <input id="p1name" class="mt-1 w-full px-3 py-2 rounded-xl border" placeholder="Player 2"/>
         </div>
         <div>
-          <label class="block text-sm font-medium">Format</label>
-          <div class="mt-1 flex flex-wrap items-center gap-3 text-sm">
-            <label class="flex items-center gap-2" id="wrap_formatStd">
-              <input id="formatStd" type="radio" name="fmt" class="accent-slate-800" checked/>
-              Standard
-            </label>
-            <label class="flex items-center gap-2">
-              <input id="formatPro" type="radio" name="fmt" class="accent-slate-800"/>
-              Pro Set (to 8, TB at 7–7)
-            </label>
-            <label class="flex items-center gap-2">
-              <input id="formatShort" type="radio" name="fmt" class="accent-slate-800"/>
-              Short Sets (to 4; TB at 3–3; Set 3 = TB10)
-            </label>
-          </div>
-
-          <div id="stdOpts" class="mt-3 flex items-center gap-3 text-sm">
-            <label class="flex items-center gap-2">
-              Best of
-              <select id="bestOf" class="px-2 py-1 rounded-lg border">
-                <option value="3" selected>3</option>
-                <option value="5">5</option>
-              </select>
-              sets
-            </label>
+          <label class="block text-sm font-medium">Best of</label>
+          <select id="bestOf" class="mt-1 w-full px-3 py-2 rounded-xl border">
+            <option value="3">3 sets</option>
+            <option value="5">5 sets</option>
+          </select>
+          <div class="mt-3 flex items-center gap-3 text-sm">
             <label class="flex items-center gap-2" id="wrap_tba66">
               <input id="tba66" type="checkbox" class="accent-slate-800" checked/>
               Tiebreak at 6–6
@@ -73,10 +55,21 @@
               <input id="finalSetTB" type="checkbox" class="accent-slate-800" checked/>
               Final set uses TB
             </label>
+            <span class="inline-block w-px h-6 bg-slate-200"></span>
+            <label class="flex items-center gap-2">
+              <input id="formatPro" type="checkbox" class="accent-slate-800"/>
+              Pro Set (to 8)
+            </label>
+            <label class="flex items-center gap-2">
+              TB at
+              <select id="proSetTBAt" class="px-2 py-1 rounded-lg border">
+                <option value="7">7–7</option>
+                <option value="8">8–8</option>
+              </select>
+            </label>
           </div>
         </div>
       </div>
-
       <div class="mt-4 flex flex-wrap items-center gap-3">
         <div class="text-sm">Server:</div>
         <label class="flex items-center gap-2 text-sm">
@@ -87,38 +80,6 @@
         </label>
         <button id="btnNewMatch" class="ml-auto px-3 py-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 text-sm">New match / Reset</button>
         <button id="btnUndo" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm">Undo last point</button>
-      </div>
-
-      <!-- Seed starting score -->
-      <div class="mt-4">
-        <button id="btnToggleSeed" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm">Start at specific score</button>
-        <div id="seedPanel" class="mt-3 hidden border rounded-xl p-3 bg-slate-50">
-          <div class="text-sm font-medium mb-2">Starting score</div>
-          <label class="block text-sm">Completed sets (comma-separated, e.g., <em>6-4, 3-6</em>)</label>
-          <input id="seedSets" class="mt-1 w-full px-3 py-2 rounded-xl border" placeholder="e.g., 6-4, 3-6"/>
-          <div class="grid grid-cols-2 gap-3 mt-3">
-            <div>
-              <label class="block text-sm">Current set games — <span id="seedP0">Player 1</span></label>
-              <input id="seedGames0" type="number" min="0" class="mt-1 w-full px-3 py-2 rounded-xl border" value="0"/>
-            </div>
-            <div>
-              <label class="block text-sm">Current set games — <span id="seedP1">Player 2</span></label>
-              <input id="seedGames1" type="number" min="0" class="mt-1 w-full px-3 py-2 rounded-xl border" value="0"/>
-            </div>
-          </div>
-          <label class="inline-flex items-center gap-2 mt-3 text-sm"><input type="checkbox" id="seedInTB" class="accent-slate-800"> In tiebreak</label>
-          <div class="grid grid-cols-2 gap-3 mt-2" id="seedTBRow">
-            <div>
-              <label class="block text-sm">TB points — <span id="seedTBP0">Player 1</span></label>
-              <input id="seedTB0" type="number" min="0" class="mt-1 w-full px-3 py-2 rounded-xl border" value="0"/>
-            </div>
-            <div>
-              <label class="block text-sm">TB points — <span id="seedTBP1">Player 2</span></label>
-              <input id="seedTB1" type="number" min="0" class="mt-1 w-full px-3 py-2 rounded-xl border" value="0"/>
-            </div>
-          </div>
-          <button id="btnApplySeed" class="mt-3 px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-sm">Apply starting score</button>
-        </div>
       </div>
     </section>
 
@@ -234,16 +195,9 @@
     </section>
 
     <!-- Point Log -->
-    <section class="mb-8 bg-white border rounded-2xl shadow-sm p-4 md:p-6">
+    <section class="mb-16 bg-white border rounded-2xl shadow-sm p-4 md:p-6">
       <h2 class="font-semibold mb-4">Point Log & Comments</h2>
       <div id="pointLog" class="space-y-2"></div>
-    </section>
-
-    <!-- End of Match Comments -->
-    <section class="mb-16 bg-white border rounded-2xl shadow-sm p-4 md:p-6">
-      <h2 class="font-semibold mb-3">End of Match Comments</h2>
-      <textarea id="matchComments" rows="3" class="mt-1 w-full px-3 py-2 rounded-xl border" placeholder="Add final thoughts, highlights, or notes after the match ends..."></textarea>
-      <div id="matchCommentsHint" class="text-xs text-slate-500 mt-2">Available after the match ends.</div>
     </section>
   </div>
 
@@ -254,7 +208,7 @@
   const asScore = (gp) => gp===0?"0":gp===1?"15":gp===2?"30":gp===3?"40":gp===4?"Ad":"";
 
   // ---------- State ----------
-  const LS_KEY = 'tennisTrackerStateV2';
+  const LS_KEY = 'tennisTrackerStateV1';
   let undoStack = [];
 
   const emptyStats = () => ({
@@ -277,20 +231,20 @@
 
   const newMatchState = () => ({
     players: [ { name: 'Player 1', stats: emptyStats() }, { name: 'Player 2', stats: emptyStats() } ],
-    settings: { bestOf: 3, tiebreakAtSixSix: true, finalSetTB: true, format: 'standard' },
+    settings: { bestOf: 3, tiebreakAtSixSix: true, finalSetTB: true, format: 'standard', proSetTBAt: 7 },
     server: 0, // index of server
     sets: [ { games: [0,0], tiebreak: false, tbPoints: [0,0] } ],
     gamePoints: [0,0], // 0,1,2,3,4(Ad)
     history: [], // array of point objects
-    matchComments: ''
   });
+
+  let state = loadState() || newMatchState();
 
   function saveState() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   function loadState() {
     try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch(e){ return null; }
   }
 
-  let state = loadState() || newMatchState();
   function pushUndo() { undoStack.push(JSON.stringify(state)); if (undoStack.length>200) undoStack.shift(); }
   function undo() {
     if (!undoStack.length) return;
@@ -302,31 +256,6 @@
 
   // ---------- Scoring Logic ----------
   function currentSet() { return state.sets[state.sets.length-1]; }
-  function getBestOfUsed() {
-    if (state.settings.format==='pro') return 1;
-    if (state.settings.format==='short') return 3;
-    return state.settings.bestOf;
-  }
-  function setsNeededToWin() { const bo = getBestOfUsed(); return Math.floor(bo/2)+1; }
-  function setsWonBy() {
-    const w = [0,0];
-    for (const s of state.sets) {
-      if (s.games[0] > s.games[1]) w[0]++;
-      else if (s.games[1] > s.games[0]) w[1]++;
-    }
-    return w;
-  }
-  function isMatchOver() {
-    const sw = setsWonBy();
-    const need = setsNeededToWin();
-    return (sw[0] >= need || sw[1] >= need);
-  }
-  function getTBTargetForCurrentSet() {
-    const set = currentSet();
-    if (set.tbTo) return set.tbTo;
-    if (state.settings.format==='short' && state.sets.length===3) return 10; // deciding match TB
-    return 7;
-  }
 
   function pointTo(playerIdx) {
     const opp = 1 - playerIdx;
@@ -335,26 +264,25 @@
     if (set.tiebreak) {
       set.tbPoints[playerIdx]++;
       const w = set.tbPoints[playerIdx], l = set.tbPoints[opp];
-      const target = getTBTargetForCurrentSet();
-      if (w>=target && (w-l)>=2) {
+      if (w>=7 && (w-l)>=2) {
+        // set won via tiebreak -> score 7-6 or 6-7
         set.games[playerIdx]++;
         finishSet(playerIdx, true);
       }
-      return;
-    }
-
-    const w = state.gamePoints[playerIdx];
-    const l = state.gamePoints[opp];
-    if (w <= 2) {
-      state.gamePoints[playerIdx]++;
-    } else if (w === 3 && l < 3) {
-      gameWonBy(playerIdx);
-    } else if (w === 3 && l === 3) {
-      state.gamePoints[playerIdx] = 4; // Advantage
-    } else if (w === 4) {
-      gameWonBy(playerIdx);
-    } else if (l === 4) {
-      state.gamePoints[opp] = 3; // back to deuce
+    } else {
+      const w = state.gamePoints[playerIdx];
+      const l = state.gamePoints[opp];
+      if (w <= 2) {
+        state.gamePoints[playerIdx]++;
+      } else if (w === 3 && l < 3) {
+        gameWonBy(playerIdx);
+      } else if (w === 3 && l === 3) {
+        state.gamePoints[playerIdx] = 4; // Advantage
+      } else if (w === 4) {
+        gameWonBy(playerIdx);
+      } else if (l === 4) {
+        state.gamePoints[opp] = 3; // back to deuce
+      }
     }
   }
 
@@ -381,47 +309,80 @@
     const w = set.games[playerIdx];
     const l = set.games[1-playerIdx];
 
-    if (state.settings.format === 'pro') {
-      if (w===7 && l===7) { set.tiebreak = true; set.tbPoints=[0,0]; set.tbTo=7; return; }
-      if (w>=8 && (w-l)>=2) { finishSet(playerIdx, false); }
+    // Pro Set logic: first to 8 by 2, TB at 7–7 or 8–8 (configurable)
+    if (state.settings && state.settings.format === 'pro') {
+      const tbAt = state.settings.proSetTBAt || 7;
+      const needTBPro = (w===tbAt && l===tbAt);
+      if (needTBPro) {
+        set.tiebreak = true;
+        set.tbPoints = [0,0];
+        return;
+      }
+      if (w>=8 && (w-l)>=2) {
+        finishSet(playerIdx, false);
+      }
       return;
     }
 
-    if (state.settings.format === 'short') {
-      // TB at 3–3 in sets 1 & 2; deciding set is a TB10 only (created in finishSet)
-      if (w===3 && l===3) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; return; }
-      if (w>=4 && (w-l)>=2) { finishSet(playerIdx, false); }
-      return;
-    }
-
-    // Standard format
+    // Standard sets logic
     const needTB = (w===6 && l===6 && state.settings.tiebreakAtSixSix && (state.settings.finalSetTB || (state.sets.length < state.settings.bestOf)));
-    if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; return; }
-    if (w>=6 && (w-l)>=2) { finishSet(playerIdx, false); }
+    if (needTB) {
+      set.tiebreak = true;
+      set.tbPoints = [0,0];
+      return;
+    }
+
+    if (w>=6 && (w-l)>=2) {
+      finishSet(playerIdx, false);
+    }
+  } else {
+      state.players[returner].stats.breaks++;
+    }
+
+    // Reset game points & rotate server
+    state.gamePoints = [0,0];
+    state.server = 1 - state.server;
+
+    // Set finished?
+    const w = set.games[playerIdx];
+    const l = set.games[1-playerIdx];
+
+    const needTB = (w===6 && l===6 && state.settings.tiebreakAtSixSix && (state.settings.finalSetTB || (state.sets.length < state.settings.bestOf)));
+    if (needTB) {
+      set.tiebreak = true;
+      set.tbPoints = [0,0];
+      return;
+    }
+
+    if (w>=6 && (w-l)>=2) {
+      finishSet(playerIdx, false);
+    }
   }
 
   function finishSet(winnerIdx, viaTB) {
-    // If match finished, do not create a new set
-    const sw = setsWonBy();
-    if (sw[winnerIdx] >= setsNeededToWin()) {
-      // Enable end-of-match comments
-      const mc = document.getElementById('matchComments');
-      const hint = document.getElementById('matchCommentsHint');
-      if (mc) mc.disabled = false;
-      if (hint) hint.textContent = 'Match finished — add your final comments.';
-      return;
+    // Start a new set if match not finished
+    const setsWon = setsWonBy();
+    const bestOfUsed = (state.settings && state.settings.format==='pro') ? 1 : state.settings.bestOf;
+    if (setsWon[winnerIdx] + 1 > Math.floor(bestOfUsed/2)) {
+      // match over; keep final set, no new set created
+      // (We still mark the set that just finished)
+    } else {
+      state.sets.push({ games: [0,0], tiebreak: false, tbPoints: [0,0] });
+      // In real rules, server for new set depends on parity/tiebreak; we continue rotation.
     }
+  } else {
+      state.sets.push({ games: [0,0], tiebreak: false, tbPoints: [0,0] });
+      // In real rules, server for new set depends on parity/tiebreak; we continue rotation.
+    }
+  }
 
-    // Otherwise start next set
-    if (state.settings.format==='short') {
-      // If now 1–1, start a deciding match tiebreak to 10
-      const swn = setsWonBy();
-      if (swn[0]===1 && swn[1]===1) {
-        state.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 });
-        return;
-      }
+  function setsWonBy() {
+    const w = [0,0];
+    for (const s of state.sets) {
+      if (s.games[0] > s.games[1]) w[0]++;
+      else if (s.games[1] > s.games[0]) w[1]++;
     }
-    state.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0] });
+    return w;
   }
 
   // ---------- Point Recording ----------
@@ -470,13 +431,16 @@
     state.players[sIdx].stats.servicePointsPlayed++;
     state.players[1-sIdx].stats.returnPointsPlayed++;
 
+    // Aces / DFs / winners / errors
     const winner = point.winner;
+    const loser = 1 - winner;
 
     if (point.doubleFault) {
       state.players[sIdx].stats.doubleFaults++;
       state.players[winner].stats.pointsWon++;
-      if (winner === sIdx) state.players[sIdx].stats.servicePointsWon++;
-      else state.players[1-sIdx].stats.returnPointsWon++;
+      state.players[sIdx].stats.servicePointsWon += (winner===sIdx?1:0);
+      state.players[1-sIdx].stats.returnPointsWon += (winner===(1-sIdx)?1:0);
+      // Score
       pointTo(winner);
       finalizePoint(point);
       return;
@@ -488,8 +452,8 @@
       }
       state.players[winner].stats.winners[point.category]++;
     } else if (point.outcome==='error') {
-      state.players[point.byPlayer].stats.errors[point.category]++;
-      if (point.forced) state.players[point.byPlayer].stats.forcedErrors[point.category]++;
+      state.players[byPlayer(point)].stats.errors[point.category]++;
+      if (point.forced) state.players[byPlayer(point)].stats.forcedErrors[point.category]++;
     }
 
     // Points won add
@@ -503,9 +467,15 @@
     finalizePoint(point);
   }
 
+  function byPlayer(point) { return point.byPlayer; }
+
   function finalizePoint(point) {
     // Save to history
     state.history.push(point);
+
+    // Sync top-level server to UI default (whoever is actually serving next)
+    // (Score logic already rotated server after each game.)
+
     saveState();
     renderAll();
 
@@ -522,16 +492,10 @@
 
   // ---------- Rendering ----------
   function renderAll() {
-    // Defaults for settings
-    if (!state.settings) state.settings = { format:'standard', bestOf:3, tiebreakAtSixSix:true, finalSetTB:true };
+    // Backward-compatible defaults for new settings
+    if (!state.settings) state.settings = {};
     if (state.settings.format === undefined) state.settings.format = 'standard';
-
-    // Format controls (radio)
-    document.getElementById('formatStd').checked = state.settings.format==='standard';
-    document.getElementById('formatPro').checked = state.settings.format==='pro';
-    document.getElementById('formatShort').checked = state.settings.format==='short';
-    updateFormatUI();
-
+    if (state.settings.proSetTBAt === undefined) state.settings.proSetTBAt = 7;
     // Names
     document.getElementById('p0name').value = state.players[0].name;
     document.getElementById('p1name').value = state.players[1].name;
@@ -539,21 +503,22 @@
     document.getElementById('server1lbl').textContent = state.players[1].name;
     document.getElementById('pf_server0').textContent = state.players[0].name;
     document.getElementById('pf_server1').textContent = state.players[1].name;
+    // Update dynamic option labels in 'By which player?'
     const byP0 = document.getElementById('byP0');
     const byP1 = document.getElementById('byP1');
     if (byP0) byP0.textContent = state.players[0].name;
     if (byP1) byP1.textContent = state.players[1].name;
 
-    // Seed labels
-    const seedP0 = document.getElementById('seedP0'); if (seedP0) seedP0.textContent = state.players[0].name;
-    const seedP1 = document.getElementById('seedP1'); if (seedP1) seedP1.textContent = state.players[1].name;
-    const seedTBP0 = document.getElementById('seedTBP0'); if (seedTBP0) seedTBP0.textContent = state.players[0].name;
-    const seedTBP1 = document.getElementById('seedTBP1'); if (seedTBP1) seedTBP1.textContent = state.players[1].name;
-
-    // Standard-only options
-    document.getElementById('bestOf').value = String(state.settings.bestOf || 3);
+    document.getElementById('bestOf').value = String(state.settings.bestOf);
     document.getElementById('tba66').checked = !!state.settings.tiebreakAtSixSix;
     document.getElementById('finalSetTB').checked = !!state.settings.finalSetTB;
+
+    // Pro Set controls
+    const formatProEl = document.getElementById('formatPro');
+    const proTBEl = document.getElementById('proSetTBAt');
+    if (formatProEl) formatProEl.checked = state.settings.format==='pro';
+    if (proTBEl) proTBEl.value = String(state.settings.proSetTBAt || 7);
+    updateFormatUI();
 
     // Server radio
     document.getElementById('server0').checked = state.server===0;
@@ -569,21 +534,14 @@
     renderQuickStats();
     renderDetailedStats();
     renderPointLog();
-
-    // Match comments
-    const mc = document.getElementById('matchComments');
-    const hint = document.getElementById('matchCommentsHint');
-    if (mc && hint) {
-      mc.value = state.matchComments || '';
-      const over = isMatchOver();
-      mc.disabled = !over;
-      hint.textContent = over ? 'Match finished — add your final comments.' : 'Available after the match ends.';
-    }
   }
 
   function renderScoreboard() {
     const el = document.getElementById('scoreboard');
+
+    // Build table: header row + player rows
     const sets = state.sets;
+    const completedSets = sets.length;
 
     let html = '<table class="min-w-full text-sm">';
     html += '<thead><tr>';
@@ -614,10 +572,9 @@
 
     const hints = document.getElementById('scoreHints');
     const sw = setsWonBy();
-    if (state.settings.format==='pro') {
-      hints.textContent = `Pro set to 8 (TB at 7–7). Server marked with 🔸.`;
-    } else if (state.settings.format==='short') {
-      hints.textContent = `Short sets to 4 (TB at 3–3). If 1–1 in sets, deciding match tiebreak to 10. Server marked with 🔸.`;
+    if (state.settings && state.settings.format==='pro') {
+      const tbAt = state.settings.proSetTBAt || 7;
+      hints.textContent = `Pro set to 8 (TB at ${tbAt}–${tbAt}). Server marked with 🔸.`;
     } else {
       const bo = state.settings.bestOf;
       const needToWin = Math.floor(bo/2)+1;
@@ -700,7 +657,7 @@
     const el = document.getElementById('pointLog');
     const rows = state.history.map((p, i) => {
       const winner = state.players[p.winner].name;
-      const by = state.players[p.byPlayer].name;
+      const by = p.outcome==='winner' ? state.players[p.byPlayer].name : state.players[p.byPlayer].name;
       let serveTxt = p.serve.firstIn? '1st-in' : p.serve.secondIn? '2nd-in' : p.doubleFault? 'DF' : 'n/a';
       const cat = p.category.toUpperCase();
       const forced = p.outcome==='error' ? (p.forced? ' (forced)' : ' (unforced)') : '';
@@ -737,20 +694,19 @@
   }
 
   function updateFormatUI() {
-    const std = document.getElementById('formatStd').checked;
-    const pro = document.getElementById('formatPro').checked;
-    const sh = document.getElementById('formatShort').checked;
-    const stdOpts = document.getElementById('stdOpts');
+    const isPro = state.settings && state.settings.format==='pro';
+    const bestOfEl = document.getElementById('bestOf');
+    const tba = document.getElementById('tba66');
+    const finalTB = document.getElementById('finalSetTB');
+    const wrapTba = document.getElementById('wrap_tba66');
+    const wrapFinal = document.getElementById('wrap_finalSetTB');
+    const proTB = document.getElementById('proSetTBAt');
 
-    if (std) state.settings.format = 'standard';
-    else if (pro) state.settings.format = 'pro';
-    else if (sh) state.settings.format = 'short';
+    if (bestOfEl) { bestOfEl.disabled = isPro; bestOfEl.classList.toggle('opacity-50', isPro); }
+    [tba, finalTB].forEach(el => { if (el){ el.disabled = isPro; el.classList.toggle('opacity-50', isPro);} });
+    [wrapTba, wrapFinal].forEach(el => { if (el) el.classList.toggle('opacity-50', isPro); });
 
-    // Enable/disable standard-only options
-    stdOpts.style.opacity = std ? '1' : '0.5';
-    for (const sel of stdOpts.querySelectorAll('select, input[type="checkbox"]')) {
-      sel.disabled = !std;
-    }
+    if (proTB) { proTB.disabled = !isPro; proTB.classList.toggle('opacity-50', !isPro); }
   }
 
   // ---------- Exports ----------
@@ -810,25 +766,15 @@
     const winner = point.doubleFault ? (1 - point.server) : point.winner;
 
     const set = sim.sets[sim.sets.length-1];
-    function tbTarget(){ if (set.tbTo) return set.tbTo; if (sim.settings.format==='short' && sim.sets.length===3) return 10; return 7; }
-
     const pointTo = (playerIdx) => {
       const opp = 1 - playerIdx;
       if (set.tiebreak) {
         set.tbPoints[playerIdx]++;
         const w = set.tbPoints[playerIdx], l = set.tbPoints[opp];
-        const target = tbTarget();
-        if (w>=target && (w-l)>=2) {
+        if (w>=7 && (w-l)>=2) {
           set.games[playerIdx]++;
-          // decide next set
-          const need = (sim.settings.format==='pro'?1:(sim.settings.format==='short'?3:sim.settings.bestOf));
-          const sw = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
-          if (sw[playerIdx] >= Math.floor(need/2)+1) return; // match over
-          if (sim.settings.format==='short') {
-            const swn = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
-            if (swn[0]===1 && swn[1]===1) { sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 }); return; }
-          }
-          sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0] });
+          // new set
+          sim.sets.push({ games: [0,0], tiebreak: false, tbPoints: [0,0] });
         }
       } else {
         const w = sim.gamePoints[playerIdx];
@@ -839,21 +785,13 @@
           sim.gamePoints=[0,0];
           sim.server = 1 - sim.server;
           const gw = set.games[playerIdx], gl = set.games[opp];
-          if (sim.settings.format==='pro') {
-            if (gw===7 && gl===7) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
-            else if (gw>=8 && (gw-gl)>=2) { sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]}); }
-          } else if (sim.settings.format==='short') {
-            if (gw===3 && gl===3) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
-            else if (gw>=4 && (gw-gl)>=2) {
-              const swn = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
-              if (!(swn[playerIdx] >= 2)) {
-                if (swn[0]===1 && swn[1]===1) sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 });
-                else sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
-              }
-            }
+          const isPro = sim.settings && sim.settings.format==='pro';
+          const needTB = isPro ? (gw===(sim.settings.proSetTBAt||7) && gl===(sim.settings.proSetTBAt||7)) : (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
+          if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
+          if (isPro) {
+            if (gw>=8 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
           } else {
-            if (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
-            else if (gw>=6 && (gw-gl)>=2) { sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]}); }
+            if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
           }
         } else if (w===3 && l===3) sim.gamePoints[playerIdx]=4;
         else if (w===4) {
@@ -861,9 +799,120 @@
           sim.gamePoints=[0,0];
           sim.server = 1 - sim.server;
           const gw = set.games[playerIdx], gl = set.games[opp];
-          if (sim.settings.format==='pro') {
-            if (gw===7 && gl===7) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
-            else if (gw>=8 && (gw-gl)>=2) { sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]}); }
-          } else if (sim.settings.format==='short') {
-            if (gw===3 && gl===3) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
-            else if (gw>=4 && (gw-gl)>=2) {
+          const isPro = sim.settings && sim.settings.format==='pro';
+          const needTB = isPro ? (gw===(sim.settings.proSetTBAt||7) && gl===(sim.settings.proSetTBAt||7)) : (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
+          if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
+          if (isPro) {
+            if (gw>=8 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+          } else {
+            if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+          }
+        } else if (l===4) sim.gamePoints[opp]=3;
+      }
+    };
+
+    pointTo(winner);
+  }
+      } else {
+        const w = sim.gamePoints[playerIdx];
+        const l = sim.gamePoints[opp];
+        if (w <= 2) sim.gamePoints[playerIdx]++;
+        else if (w===3 && l<3) {
+          set.games[playerIdx]++;
+          sim.gamePoints=[0,0];
+          sim.server = 1 - sim.server;
+          const gw = set.games[playerIdx], gl = set.games[opp];
+          const needTB = (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
+          if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
+          if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+        } else if (w===3 && l===3) sim.gamePoints[playerIdx]=4;
+        else if (w===4) {
+          set.games[playerIdx]++;
+          sim.gamePoints=[0,0];
+          sim.server = 1 - sim.server;
+          const gw = set.games[playerIdx], gl = set.games[opp];
+          const needTB = (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix);
+          if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; }
+          if (gw>=6 && (gw-gl)>=2) sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+        } else if (l===4) sim.gamePoints[opp]=3;
+      }
+    };
+
+    pointTo(winner);
+  }
+
+  // ---------- Events ----------
+  document.getElementById('btnUndo').addEventListener('click', () => undo());
+  document.getElementById('btnNewMatch').addEventListener('click', () => {
+    if (!confirm('Start a new match and clear current data?')) return;
+    pushUndo();
+    state = newMatchState();
+    saveState();
+    renderAll();
+  });
+
+  document.getElementById('p0name').addEventListener('input', (e)=>{ state.players[0].name=e.target.value; saveState(); renderAll(); });
+  document.getElementById('p1name').addEventListener('input', (e)=>{ state.players[1].name=e.target.value; saveState(); renderAll(); });
+  document.getElementById('bestOf').addEventListener('change', (e)=>{
+    state.settings.bestOf=+e.target.value;
+    state.settings.format='standard';
+    saveState(); renderAll();
+  });
+  document.getElementById('tba66').addEventListener('change', (e)=>{ state.settings.tiebreakAtSixSix=!!e.target.checked; saveState(); renderAll(); });
+  document.getElementById('finalSetTB').addEventListener('change', (e)=>{ state.settings.finalSetTB=!!e.target.checked; saveState(); renderAll(); });
+  document.getElementById('server0').addEventListener('change', ()=>{ state.server=0; saveState(); renderAll(); });
+  document.getElementById('server1').addEventListener('change', ()=>{ state.server=1; saveState(); renderAll(); });
+
+  document.getElementById('pointForm').addEventListener('change', (e)=>{
+    if (e.target.name==='endType') {
+      document.getElementById('forcedWrap').classList.toggle('hidden', e.target.value!=='error');
+    }
+    updateDynamicDefaults();
+  });
+
+  document.getElementById('pointForm').addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    recordPoint(fd);
+  });
+
+  document.getElementById('btnClearComment').addEventListener('click', ()=>{
+    document.querySelector('[name="comment"]').value='';
+  });
+
+  document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
+  document.getElementById('btnExportJSON').addEventListener('click', exportJSON);
+  // Pro set events
+  document.getElementById('formatPro').addEventListener('change', (e)=>{
+    state.settings.format = e.target.checked ? 'pro' : 'standard';
+    saveState();
+    renderAll();
+  });
+  document.getElementById('proSetTBAt').addEventListener('change', (e)=>{
+    state.settings.proSetTBAt = +e.target.value || 7;
+    saveState();
+  });
+  document.getElementById('inputImportJSON').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const txt = await file.text();
+      const obj = JSON.parse(txt);
+      if (!obj || !obj.players || !obj.sets) throw new Error('Invalid file.');
+      pushUndo();
+      state = obj;
+      saveState();
+      renderAll();
+      alert('Import successful.');
+    } catch(err) {
+      alert('Import failed: '+err.message);
+    } finally {
+      e.target.value = '';
+    }
+  });
+
+  // Initial render
+  renderAll();
+  </script>
+</body>
+</html>
