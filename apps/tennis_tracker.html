@@ -276,8 +276,11 @@
   const asScore = (gp) => gp===0?"0":gp===1?"15":gp===2?"30":gp===3?"40":gp===4?"Ad":"";
 
   // ---------- State ----------
-  const LS_KEY = 'tennisTrackerState_V3';
+  const LS_KEY = 'tennisTrackerState_V4';
   let undoStack = [];
+
+  // Track if the user has manually adjusted specific fields (prevents auto-overwrite)
+  const userEdited = { byPlayer: false, category: false };
 
   const emptyStats = () => ({
     firstServe: {attempts:0, in:0},
@@ -295,6 +298,7 @@
     serviceGamesHeld: 0,
     returnGamesPlayed: 0,
     breaks: 0,
+    // Break point stats
     bpEarned: 0, bpConverted: 0,   // returner side
     bpFaced: 0,  bpSaved: 0        // server side
   });
@@ -338,10 +342,10 @@
   function isBreakPoint(serverIdx) {
     const recv = 1 - serverIdx, gpS = state.gamePoints[serverIdx], gpR = state.gamePoints[recv], set = currentSet();
     if (set.tiebreak) return false;
-    return (gpR===3 && gpS<=2) || (gpR===4 && gpS===3);
+    return (gpR===3 && gpS<=2) || (gpR===4 && gpS===3); // 30-40, 15-40, 0-40, Ad-Receiver
   }
 
-  // NEW: clear labeling + preview for winner
+  // Clear labeling + preview for winner
   function getDeclaredWinnerFromForm(form){
     const sEl = form.querySelector('input[name="pf_server"]:checked');
     const sIdx = sEl ? +sEl.value : 0;
@@ -430,10 +434,10 @@
   function recordPoint(formData) {
     const formEl = document.getElementById('pointForm');
     const server = +formData.get('pf_server');
-    const serveResult = formData.get('serveResult'); // radios/select values
-    const endType = formData.get('endType');         // winner | error
+    const serveResult = formData.get('serveResult');
+    const endType = formData.get('endType');
     const byPlayer = +formData.get('byPlayer');
-    const category = formData.get('category');       // fh,bh,serve,fhv,bhv,oh
+    const category = formData.get('category');
     const comment = (formData.get('comment')||'').trim();
 
     const breakPoint = isBreakPoint(server);
@@ -516,7 +520,12 @@
     document.getElementById('lastPoint').textContent =
       `#${n}: ${pName} won the point (${point.outcome} – ${cat}; serve: ${sr}${bp})${point.comment?` — ${point.comment}`:''}`;
 
+    // Reset only the comment field
     const cEl = document.querySelector('[name="comment"]'); if (cEl) cEl.value = '';
+
+    // Next point: allow sensible defaults again
+    userEdited.byPlayer = false;
+    userEdited.category = false;
   }
 
   // ---------- Rendering ----------
@@ -694,18 +703,34 @@
 
   function escapeHtml(str) { return str.replace(/[&<>"]+/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
 
-  // ---------- Dynamic defaults for point form ----------
+  // ---------- Dynamic defaults for point form (guarded) ----------
   function updateDynamicDefaults() {
     const form = document.getElementById('pointForm'); if (!form) return;
-    const sRadio = form.querySelector('input[name="pf_server"]:checked'); if (!sRadio) return;
-    const sIdx = +sRadio.value, rIdx = 1 - sIdx;
+
+    const sRadio = form.querySelector('input[name="pf_server"]:checked');
+    if (!sRadio) return;
+    const sIdx = +sRadio.value;
+    const rIdx = 1 - sIdx;
+
     const endTypeEl = form.querySelector('input[name="endType"]:checked');
     const endType = endTypeEl ? endTypeEl.value : 'winner';
+
     const bySel = form.querySelector('select[name="byPlayer"]');
     const catSel = form.querySelector('select[name="category"]');
 
-    if (endType === 'winner') { if (bySel) bySel.value = String(sIdx); if (catSel) catSel.value = 'serve'; }
-    else if (endType === 'error') { if (bySel) bySel.value = String(rIdx); }
+    // Apply defaults only if the user hasn't edited these yet
+    const byDefault  = (endType === 'winner') ? sIdx : rIdx;
+    if (bySel && !userEdited.byPlayer) {
+      bySel.value = String(byDefault);
+    }
+
+    if (catSel && endType === 'winner' && !userEdited.category) {
+      // Suggest "Serve" for winners by default; user can change and it will stick
+      catSel.value = 'serve';
+    }
+
+    updateByWhichLabel();
+    updatePointWinnerPreview();
   }
 
   function updateFormatUI() {
@@ -823,8 +848,10 @@
             else if (gw>=4 && (gw-gl)>=2) {
               const swn2 = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
               if (!(swn2[playerIdx] >= 2)) {
-              if (swn2[0]===1 && swn2[1]===1)sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 });
-                else sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+                if (swn2[0]===1 && swn2[1]===1)
+                  sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 }); /* <- fixed ':' */
+                else
+                  sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
               }
             }
           } else {
@@ -888,15 +915,31 @@
     saveState(); renderAll(); alert('Starting score applied.');
   });
 
-  // Point form
+  // Point form change handling (guarded)
   document.getElementById('pointForm').addEventListener('change', (e)=>{
+    // Show/hide forced error toggle
     if (e.target.name==='endType') {
       document.getElementById('forcedWrap').classList.toggle('hidden', e.target.value!=='error');
     }
+
+    // If the defaults' drivers changed, allow defaults to reapply
+    if (e.target.name==='endType' || e.target.name==='pf_server') {
+      userEdited.byPlayer = false;
+      userEdited.category = false;
+    }
+
     updateDynamicDefaults();
-    updateByWhichLabel();
+  });
+
+  // Mark fields as explicitly edited by the user
+  document.querySelector('select[name="byPlayer"]').addEventListener('change', ()=>{
+    userEdited.byPlayer = true;
     updatePointWinnerPreview();
   });
+  document.querySelector('select[name="category"]').addEventListener('change', ()=>{
+    userEdited.category = true;
+  });
+
   document.getElementById('pointForm').addEventListener('submit', (e)=>{
     e.preventDefault(); const fd = new FormData(e.target); recordPoint(fd);
   });
