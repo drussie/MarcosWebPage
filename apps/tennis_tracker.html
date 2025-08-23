@@ -160,11 +160,20 @@
 
           <div>
             <label class="block text-sm font-medium">Serve result</label>
-            <select name="serveResult" class="mt-1 w-full px-3 py-2 rounded-xl border">
-              <option value="1stin">1st serve in</option>
-              <option value="1stout_2ndin">1st out → 2nd in</option>
-              <option value="df">Double fault (2nd out)</option>
-            </select>
+            <div class="mt-2 flex flex-wrap gap-4 text-sm">
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="serveResult" value="1stin" class="accent-slate-800" checked>
+                1st in
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="serveResult" value="1stout_2ndin" class="accent-slate-800">
+                1st out → 2nd in
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="serveResult" value="df" class="accent-slate-800">
+                Double fault
+              </label>
+            </div>
           </div>
 
           <div>
