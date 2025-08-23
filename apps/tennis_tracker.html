@@ -9,6 +9,7 @@
   <style>
     .shadow-soft { box-shadow: 0 8px 30px rgba(0,0,0,.08); }
     .grid-auto { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: .75rem; }
+    .kbd { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:.375rem; padding:.0625rem .375rem; font-size:.75rem; }
   </style>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900">
@@ -19,8 +20,8 @@
         <p class="text-slate-600">Track score, point-by-point outcomes, and rich stats for both players. Data auto-saves to this browser.</p>
       </div>
       <div class="flex items-center gap-2">
-        <button id="btnExportCSV" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 shadow-sm text-sm">Export CSV</button>
-        <button id="btnExportJSON" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 shadow-sm text-sm">Export JSON</button>
+        <button id="btnExportCSV" type="button" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 shadow-sm text-sm">Export CSV</button>
+        <button id="btnExportJSON" type="button" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 shadow-sm text-sm">Export JSON</button>
         <label class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 shadow-sm text-sm cursor-pointer">
           Import JSON
           <input id="inputImportJSON" type="file" accept="application/json" class="hidden"/>
@@ -56,7 +57,7 @@
             </label>
           </div>
 
-          <div id="stdOpts" class="mt-3 flex items-center gap-3 text-sm">
+          <div id="stdOpts" class="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <label class="flex items-center gap-2">
               Best of
               <select id="bestOf" class="px-2 py-1 rounded-lg border">
@@ -85,13 +86,13 @@
         <label class="flex items-center gap-2 text-sm">
           <input type="radio" name="server" id="server1" class="accent-slate-800"/> <span id="server1lbl">Player 2</span>
         </label>
-        <button id="btnNewMatch" class="ml-auto px-3 py-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 text-sm">New match / Reset</button>
-        <button id="btnUndo" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm">Undo last point</button>
+        <button id="btnNewMatch" type="button" class="ml-auto px-3 py-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 text-sm">New match / Reset</button>
+        <button id="btnUndo" type="button" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm">Undo last point</button>
       </div>
 
       <!-- Seed starting score -->
       <div class="mt-4">
-        <button id="btnToggleSeed" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm">Start at specific score</button>
+        <button id="btnToggleSeed" type="button" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm">Start at specific score</button>
         <div id="seedPanel" class="mt-3 hidden border rounded-xl p-3 bg-slate-50">
           <div class="text-sm font-medium mb-2">Starting score</div>
           <label class="block text-sm">Completed sets (comma-separated, e.g., <em>6-4, 3-6</em>)</label>
@@ -117,7 +118,10 @@
               <input id="seedTB1" type="number" min="0" class="mt-1 w-full px-3 py-2 rounded-xl border" value="0"/>
             </div>
           </div>
-          <button id="btnApplySeed" class="mt-3 px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-sm">Apply starting score</button>
+          <button id="btnApplySeed" type="button" class="mt-3 px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-sm">Apply starting score</button>
+          <div class="mt-2 text-xs text-slate-500">
+            Tip: Server radio above controls who serves the next point.
+          </div>
         </div>
       </div>
     </section>
@@ -210,7 +214,7 @@
           </div>
           <div class="flex items-center gap-3">
             <button class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium" type="submit">Record point</button>
-            <button id="btnClearComment" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm" type="button">Clear</button>
+            <button id="btnClearComment" type="button" class="px-3 py-2 rounded-xl bg-white border hover:bg-slate-50 text-sm">Clear</button>
           </div>
         </div>
 
@@ -248,13 +252,20 @@
   </div>
 
   <script>
+  // ---------- Safety guard: prevent accidental submits ----------
+  document.querySelectorAll('button:not([type])').forEach(b => b.type = 'button');
+  window.addEventListener('submit', (e) => {
+    // Only the point form should submit (and we handle it with preventDefault anyway)
+    if (e.target && e.target.id !== 'pointForm') e.preventDefault();
+  }, true);
+
   // ---------- Utilities ----------
   const deepClone = (o) => JSON.parse(JSON.stringify(o));
   const pct = (num, den) => den ? (100 * num / den) : 0;
   const asScore = (gp) => gp===0?"0":gp===1?"15":gp===2?"30":gp===3?"40":gp===4?"Ad":"";
 
   // ---------- State ----------
-  const LS_KEY = 'tennisTrackerStateV2';
+  const LS_KEY = 'tennisTrackerState_V3';
   let undoStack = [];
 
   const emptyStats = () => ({
@@ -273,11 +284,14 @@
     serviceGamesHeld: 0,
     returnGamesPlayed: 0,
     breaks: 0,
+    // Break point stats
+    bpEarned: 0, bpConverted: 0,   // as returner
+    bpFaced: 0,  bpSaved: 0        // as server
   });
 
   const newMatchState = () => ({
     players: [ { name: 'Player 1', stats: emptyStats() }, { name: 'Player 2', stats: emptyStats() } ],
-    settings: { bestOf: 3, tiebreakAtSixSix: true, finalSetTB: true, format: 'standard' },
+    settings: { bestOf: 3, tiebreakAtSixSix: true, finalSetTB: true, format: 'standard' }, // standard|pro|short
     server: 0, // index of server
     sets: [ { games: [0,0], tiebreak: false, tbPoints: [0,0] } ],
     gamePoints: [0,0], // 0,1,2,3,4(Ad)
@@ -300,7 +314,7 @@
     saveState();
   }
 
-  // ---------- Scoring Logic ----------
+  // ---------- Helpers ----------
   function currentSet() { return state.sets[state.sets.length-1]; }
   function getBestOfUsed() {
     if (state.settings.format==='pro') return 1;
@@ -327,7 +341,18 @@
     if (state.settings.format==='short' && state.sets.length===3) return 10; // deciding match TB
     return 7;
   }
+  function isBreakPoint(serverIdx) {
+    const recv = 1 - serverIdx;
+    const gpS = state.gamePoints[serverIdx];
+    const gpR = state.gamePoints[recv];
+    const set = currentSet();
+    if (set.tiebreak) return false; // no break points in tiebreaks
+    // Receiver can win the game on this point:
+    // 0-40, 15-40, 30-40, or Ad-Receiver
+    return (gpR===3 && gpS<=2) || (gpR===4 && gpS===3);
+  }
 
+  // ---------- Scoring Logic ----------
   function pointTo(playerIdx) {
     const opp = 1 - playerIdx;
     const set = currentSet();
@@ -403,7 +428,8 @@
   function finishSet(winnerIdx, viaTB) {
     // If match finished, do not create a new set
     const sw = setsWonBy();
-    if (sw[winnerIdx] >= setsNeededToWin()) {
+    const need = setsNeededToWin();
+    if (sw[winnerIdx] >= need) {
       // Enable end-of-match comments
       const mc = document.getElementById('matchComments');
       const hint = document.getElementById('matchCommentsHint');
@@ -433,6 +459,9 @@
     const category = formData.get('category'); // fh,bh,serve,fhv,bhv,oh
     const comment = (formData.get('comment')||'').trim();
 
+    // Determine break point BEFORE the rally based on current state
+    const breakPoint = isBreakPoint(server);
+
     const point = {
       server,
       serve: { firstAttempt: true, firstIn: (serveResult==='1stin'), doubleFault: (serveResult==='df'), secondIn: (serveResult==='1stout_2ndin') },
@@ -441,14 +470,13 @@
       category,
       forced: endType==='error' ? !!formData.get('forced') : false,
       comment,
+      breakPoint,
       timestamp: Date.now()
     };
 
-    // Validate edge cases
+    // Infer winner
     if (serveResult==='df') {
-      // point winner is returner
-      point.winner = 1 - server;
-      point.doubleFault = true;
+      point.winner = 1 - server; point.doubleFault = true;
     } else if (endType==='winner') {
       point.winner = byPlayer;
     } else if (endType==='error') {
@@ -471,12 +499,30 @@
     state.players[1-sIdx].stats.returnPointsPlayed++;
 
     const winner = point.winner;
+    const loser = 1 - winner;
+
+    // Break point stats (if this rally started at a break point)
+    if (point.breakPoint) {
+      const recv = 1 - sIdx;
+      state.players[recv].stats.bpEarned++;
+      state.players[sIdx].stats.bpFaced++;
+    }
 
     if (point.doubleFault) {
       state.players[sIdx].stats.doubleFaults++;
       state.players[winner].stats.pointsWon++;
       if (winner === sIdx) state.players[sIdx].stats.servicePointsWon++;
       else state.players[1-sIdx].stats.returnPointsWon++;
+
+      // If DF occurred on a break point, it's a conversion for returner
+      if (point.breakPoint && winner !== sIdx) {
+        const recv = 1 - sIdx;
+        state.players[recv].stats.bpConverted++;
+        state.players[sIdx].stats.bpSaved += 0; // no save
+      } else if (point.breakPoint && winner === sIdx) {
+        state.players[sIdx].stats.bpSaved++;
+      }
+
       pointTo(winner);
       finalizePoint(point);
       return;
@@ -497,6 +543,16 @@
     if (winner === sIdx) state.players[sIdx].stats.servicePointsWon++;
     else state.players[1-sIdx].stats.returnPointsWon++;
 
+    // If this was a break point, register converted/saved
+    if (point.breakPoint) {
+      if (winner !== sIdx) {
+        const recv = 1 - sIdx;
+        state.players[recv].stats.bpConverted++;
+      } else {
+        state.players[sIdx].stats.bpSaved++;
+      }
+    }
+
     // Score advance
     pointTo(winner);
 
@@ -514,10 +570,12 @@
     const pName = state.players[point.winner].name;
     const cat = point.category.toUpperCase();
     let sr = point.serve.firstIn ? '1st-in' : (point.serve.secondIn ? '2nd-in' : (point.doubleFault?'DF':'n/a'));
-    document.getElementById('lastPoint').textContent = `#${n}: ${pName} won the point (${point.outcome} – ${cat}; serve: ${sr})${point.comment?` — ${point.comment}`:''}`;
+    const bp = point.breakPoint ? ' — BP' : '';
+    document.getElementById('lastPoint').textContent = `#${n}: ${pName} won the point (${point.outcome} – ${cat}; serve: ${sr}${bp})${point.comment?` — ${point.comment}`:''}`;
 
     // Clear comment field only
-    document.querySelector('[name="comment"]').value = '';
+    const cEl = document.querySelector('[name="comment"]');
+    if (cEl) cEl.value = '';
   }
 
   // ---------- Rendering ----------
@@ -637,6 +695,8 @@
       const holds = p.stats.serviceGamesHeld;
       const sGP = p.stats.serviceGamesPlayed;
       const breaks = p.stats.breaks;
+      const bpE = p.stats.bpEarned, bpC = p.stats.bpConverted;
+      const bpF = p.stats.bpFaced,  bpS = p.stats.bpSaved;
       return `
       <div class="rounded-2xl border p-4">
         <div class="font-semibold mb-1">${p.name}</div>
@@ -649,6 +709,7 @@
           <div><div class="text-slate-500">Srv Pts Won %</div><div class="font-medium">${pct(spw, spp).toFixed(1)}%</div></div>
           <div><div class="text-slate-500">Ret Pts Won %</div><div class="font-medium">${pct(rpw, rpp).toFixed(1)}%</div></div>
           <div><div class="text-slate-500">Breaks</div><div class="font-medium">${breaks}</div></div>
+          <div><div class="text-slate-500">Break Points</div><div class="font-medium">${bpC}/${bpE} converted • saved ${bpS}/${bpF}</div></div>
         </div>
       </div>`;
     };
@@ -704,9 +765,10 @@
       let serveTxt = p.serve.firstIn? '1st-in' : p.serve.secondIn? '2nd-in' : p.doubleFault? 'DF' : 'n/a';
       const cat = p.category.toUpperCase();
       const forced = p.outcome==='error' ? (p.forced? ' (forced)' : ' (unforced)') : '';
+      const bp = p.breakPoint ? ' • BP' : '';
       const c = p.comment? `<div class='text-slate-500 mt-1'>${escapeHtml(p.comment)}</div>` : '';
       return `<div class="p-3 border rounded-xl">
-        <div class="text-sm"><span class="text-slate-500">#${i+1}</span> <span class="font-medium">${winner}</span> won — ${p.outcome} by ${by} • ${cat} • serve ${serveTxt}${forced}</div>
+        <div class="text-sm"><span class="text-slate-500">#${i+1}</span> <span class="font-medium">${winner}</span> won — ${p.outcome} by ${by} • ${cat} • serve ${serveTxt}${forced}${bp}</div>
         ${c}
       </div>`;
     });
@@ -768,8 +830,8 @@
 
   function exportCSV() {
     const lines = [];
-    lines.push(['point','server','firstServeIn','secondServeIn','doubleFault','winner','byPlayer','outcome','category','forced','comment','setIdx','gamesP0','gamesP1','tb','tbP0','tbP1'].join(','));
-    // To reconstruct set/game at time of point, we simulate through history
+    lines.push(['point','server','firstServeIn','secondServeIn','doubleFault','winner','byPlayer','outcome','category','forced','breakPoint','comment','setIdx','gamesP0','gamesP1','tb','tbP0','tbP1'].join(','));
+    // To reconstruct set/game at time of point, simulate through history
     const sim = newMatchState();
     sim.players[0].name = state.players[0].name; sim.players[1].name = state.players[1].name;
     sim.settings = deepClone(state.settings);
@@ -790,6 +852,7 @@
         p.outcome,
         p.category,
         p.outcome==='error'?(p.forced?1:0):'',
+        p.breakPoint?1:0,
         '"'+(p.comment||'').replace(/"/g,'""')+'"',
         sim.sets.length,
         cs.games[0], cs.games[1],
@@ -867,3 +930,136 @@
           } else if (sim.settings.format==='short') {
             if (gw===3 && gl===3) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
             else if (gw>=4 && (gw-gl)>=2) {
+              const swn2 = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
+              if (!(swn2[playerIdx] >= 2)) {
+                if (swn2[0]===1 && swn2[1]===1) sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 });
+                else sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
+              }
+            }
+          } else {
+            if (gw===6 && gl===6 && sim.settings.tiebreakAtSixSix) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
+            else if (gw>=6 && (gw-gl)>=2) { sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]}); }
+          }
+        } else if (l===4) sim.gamePoints[opp]=3;
+      }
+    };
+
+    pointTo(winner);
+  }
+
+  // ---------- Events ----------
+  document.getElementById('btnUndo').addEventListener('click', () => undo());
+  document.getElementById('btnNewMatch').addEventListener('click', () => {
+    if (!confirm('Start a new match and clear current data?')) return;
+    pushUndo();
+    state = newMatchState();
+    saveState();
+    renderAll();
+  });
+
+  document.getElementById('p0name').addEventListener('input', (e)=>{ state.players[0].name=e.target.value; saveState(); renderAll(); });
+  document.getElementById('p1name').addEventListener('input', (e)=>{ state.players[1].name=e.target.value; saveState(); renderAll(); });
+
+  // Format radios + standard options
+  document.getElementById('formatStd').addEventListener('change', ()=>{ updateFormatUI(); saveState(); renderAll(); });
+  document.getElementById('formatPro').addEventListener('change', ()=>{ updateFormatUI(); saveState(); renderAll(); });
+  document.getElementById('formatShort').addEventListener('change', ()=>{ updateFormatUI(); saveState(); renderAll(); });
+
+  document.getElementById('bestOf').addEventListener('change', (e)=>{
+    state.settings.bestOf=+e.target.value;
+    state.settings.format='standard';
+    saveState(); renderAll();
+  });
+  document.getElementById('tba66').addEventListener('change', (e)=>{ state.settings.tiebreakAtSixSix=!!e.target.checked; saveState(); renderAll(); });
+  document.getElementById('finalSetTB').addEventListener('change', (e)=>{ state.settings.finalSetTB=!!e.target.checked; saveState(); renderAll(); });
+
+  document.getElementById('server0').addEventListener('change', ()=>{ state.server=0; saveState(); renderAll(); });
+  document.getElementById('server1').addEventListener('change', ()=>{ state.server=1; saveState(); renderAll(); });
+
+  // Seed panel
+  document.getElementById('btnToggleSeed').addEventListener('click', ()=>{
+    document.getElementById('seedPanel').classList.toggle('hidden');
+  });
+  document.getElementById('seedInTB').addEventListener('change', (e)=>{
+    document.getElementById('seedTBRow').classList.toggle('hidden', !e.target.checked);
+  });
+  document.getElementById('btnApplySeed').addEventListener('click', ()=>{
+    // Parse completed sets like "6-4, 3-6"
+    function parseSets(txt){
+      const out=[];
+      (txt||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(p=>{
+        const m = p.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+        if (m){ out.push([+m[1], +m[2]]); }
+      });
+      return out;
+    }
+    const completed = parseSets(document.getElementById('seedSets').value);
+    const g0 = +document.getElementById('seedGames0').value || 0;
+    const g1 = +document.getElementById('seedGames1').value || 0;
+    const inTB = !!document.getElementById('seedInTB').checked;
+    const tb0 = +document.getElementById('seedTB0').value || 0;
+    const tb1 = +document.getElementById('seedTB1').value || 0;
+
+    pushUndo();
+
+    state.sets = completed.map(g=>({ games:[g[0], g[1]], tiebreak:false, tbPoints:[0,0] }));
+    state.sets.push({ games:[g0,g1], tiebreak:inTB, tbPoints:[tb0,tb1] });
+    delete state.sets[state.sets.length-1].tbTo; // will be inferred by format logic
+    state.gamePoints = [0,0];
+    saveState();
+    renderAll();
+    alert('Starting score applied.');
+  });
+
+  // Point form interactions
+  document.getElementById('pointForm').addEventListener('change', (e)=>{
+    if (e.target.name==='endType') {
+      document.getElementById('forcedWrap').classList.toggle('hidden', e.target.value!=='error');
+    }
+    updateDynamicDefaults();
+  });
+
+  document.getElementById('pointForm').addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    recordPoint(fd);
+  });
+
+  document.getElementById('btnClearComment').addEventListener('click', ()=>{
+    const c = document.querySelector('[name="comment"]');
+    if (c) c.value='';
+  });
+
+  // Export / Import
+  document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
+  document.getElementById('btnExportJSON').addEventListener('click', exportJSON);
+  document.getElementById('inputImportJSON').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const txt = await file.text();
+      const obj = JSON.parse(txt);
+      if (!obj || !obj.players || !obj.sets) throw new Error('Invalid file.');
+      pushUndo();
+      state = obj;
+      saveState();
+      renderAll();
+      alert('Import successful.');
+    } catch(err) {
+      alert('Import failed: '+err.message);
+    } finally {
+      e.target.value = '';
+    }
+  });
+
+  // Match comments save-on-input
+  document.getElementById('matchComments').addEventListener('input', (e)=>{
+    state.matchComments = e.target.value;
+    saveState();
+  });
+
+  // Initial render
+  renderAll();
+  </script>
+</body>
+</html>
