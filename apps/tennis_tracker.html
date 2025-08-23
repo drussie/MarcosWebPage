@@ -823,7 +823,7 @@
             else if (gw>=4 && (gw-gl)>=2) {
               const swn2 = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
               if (!(swn2[playerIdx] >= 2)) {
-                if (swn2[0]===1 && swn2[1]===1) sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo=10 });
+              if (swn2[0]===1 && swn2[1]===1)sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 });
                 else sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
               }
             }
