@@ -148,7 +148,7 @@
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium">Server for this point</label>
-            <div class="mt-2 flex items-center gap-4 text-sm">
+            <div class="mt-2 flex flex-wrap items-center gap-4 text-sm">
               <label class="flex items-center gap-2">
                 <input type="radio" name="pf_server" value="0" class="accent-slate-800"/> <span id="pf_server0">Player 1</span>
               </label>
@@ -192,11 +192,14 @@
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-sm font-medium">By which player?</label>
+              <label class="block text-sm font-medium">
+                <span id="byWhichLabel">By which player?</span>
+              </label>
               <select name="byPlayer" class="mt-1 w-full px-3 py-2 rounded-xl border">
                 <option value="0" id="byP0">Player 1</option>
                 <option value="1" id="byP1">Player 2</option>
               </select>
+              <div id="pointWinnerPreview" class="mt-1 text-xs text-slate-500"></div>
             </div>
             <div>
               <label class="block text-sm font-medium">Category</label>
@@ -264,7 +267,6 @@
   // ---------- Safety guard: prevent accidental submits ----------
   document.querySelectorAll('button:not([type])').forEach(b => b.type = 'button');
   window.addEventListener('submit', (e) => {
-    // Only the point form should submit (and we handle it with preventDefault anyway)
     if (e.target && e.target.id !== 'pointForm') e.preventDefault();
   }, true);
 
@@ -293,25 +295,22 @@
     serviceGamesHeld: 0,
     returnGamesPlayed: 0,
     breaks: 0,
-    // Break point stats
-    bpEarned: 0, bpConverted: 0,   // as returner
-    bpFaced: 0,  bpSaved: 0        // as server
+    bpEarned: 0, bpConverted: 0,   // returner side
+    bpFaced: 0,  bpSaved: 0        // server side
   });
 
   const newMatchState = () => ({
     players: [ { name: 'Player 1', stats: emptyStats() }, { name: 'Player 2', stats: emptyStats() } ],
     settings: { bestOf: 3, tiebreakAtSixSix: true, finalSetTB: true, format: 'standard' }, // standard|pro|short
-    server: 0, // index of server
+    server: 0,
     sets: [ { games: [0,0], tiebreak: false, tbPoints: [0,0] } ],
-    gamePoints: [0,0], // 0,1,2,3,4(Ad)
-    history: [], // array of point objects
+    gamePoints: [0,0],
+    history: [],
     matchComments: ''
   });
 
   function saveState() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
-  function loadState() {
-    try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch(e){ return null; }
-  }
+  function loadState() { try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch(e){ return null; } }
 
   let state = loadState() || newMatchState();
   function pushUndo() { undoStack.push(JSON.stringify(state)); if (undoStack.length>200) undoStack.shift(); }
@@ -319,157 +318,126 @@
     if (!undoStack.length) return;
     const prev = undoStack.pop();
     state = JSON.parse(prev);
-    renderAll();
-    saveState();
+    renderAll(); saveState();
   }
 
   // ---------- Helpers ----------
   function currentSet() { return state.sets[state.sets.length-1]; }
-  function getBestOfUsed() {
-    if (state.settings.format==='pro') return 1;
-    if (state.settings.format==='short') return 3;
-    return state.settings.bestOf;
-  }
+  function getBestOfUsed() { return state.settings.format==='pro' ? 1 : (state.settings.format==='short' ? 3 : state.settings.bestOf); }
   function setsNeededToWin() { const bo = getBestOfUsed(); return Math.floor(bo/2)+1; }
   function setsWonBy() {
-    const w = [0,0];
-    for (const s of state.sets) {
-      if (s.games[0] > s.games[1]) w[0]++;
-      else if (s.games[1] > s.games[0]) w[1]++;
-    }
-    return w;
+    const w=[0,0]; for (const s of state.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w;
   }
   function isMatchOver() {
-    const sw = setsWonBy();
-    const need = setsNeededToWin();
-    return (sw[0] >= need || sw[1] >= need);
+    const sw = setsWonBy(); const need = setsNeededToWin(); return (sw[0] >= need || sw[1] >= need);
   }
   function getTBTargetForCurrentSet() {
-    const set = currentSet();
-    if (set.tbTo) return set.tbTo;
-    if (state.settings.format==='short' && state.sets.length===3) return 10; // deciding match TB
-    return 7;
+    const set = currentSet(); if (set.tbTo) return set.tbTo;
+    if (state.settings.format==='short' && state.sets.length===3) return 10; return 7;
   }
   function isBreakPoint(serverIdx) {
-    const recv = 1 - serverIdx;
-    const gpS = state.gamePoints[serverIdx];
-    const gpR = state.gamePoints[recv];
-    const set = currentSet();
-    if (set.tiebreak) return false; // no break points in tiebreaks
-    // Receiver can win the game on this point:
-    // 0-40, 15-40, 30-40, or Ad-Receiver
+    const recv = 1 - serverIdx, gpS = state.gamePoints[serverIdx], gpR = state.gamePoints[recv], set = currentSet();
+    if (set.tiebreak) return false;
     return (gpR===3 && gpS<=2) || (gpR===4 && gpS===3);
+  }
+
+  // NEW: clear labeling + preview for winner
+  function getDeclaredWinnerFromForm(form){
+    const sEl = form.querySelector('input[name="pf_server"]:checked');
+    const sIdx = sEl ? +sEl.value : 0;
+    const endEl = form.querySelector('input[name="endType"]:checked');
+    const endType = endEl ? endEl.value : 'winner';
+    const srEl = form.querySelector('input[name="serveResult"]:checked') ||
+                 form.querySelector('select[name="serveResult"]');
+    const serveResult = srEl ? srEl.value : '1stin';
+    if (serveResult === 'df') return 1 - sIdx; // DF → returner
+    const bySel = form.querySelector('select[name="byPlayer"]');
+    const by = bySel ? +bySel.value : sIdx;
+    return endType === 'winner' ? by : (1 - by);
+  }
+  function updateByWhichLabel(){
+    const form = document.getElementById('pointForm'); if (!form) return;
+    const endEl = form.querySelector('input[name="endType"]:checked');
+    const lbl = document.getElementById('byWhichLabel'); if (!lbl) return;
+    const endType = endEl ? endEl.value : 'winner';
+    lbl.textContent = endType === 'winner' ? 'Who hit the winner?' : 'Who made the error?';
+  }
+  function updatePointWinnerPreview(){
+    const form = document.getElementById('pointForm'); const prev = document.getElementById('pointWinnerPreview');
+    if (!form || !prev) return;
+    const w = getDeclaredWinnerFromForm(form);
+    const name = (state && state.players && state.players[w]) ? state.players[w].name : (w===0?'Player 1':'Player 2');
+    prev.textContent = `Point goes to: ${name}`;
   }
 
   // ---------- Scoring Logic ----------
   function pointTo(playerIdx) {
-    const opp = 1 - playerIdx;
-    const set = currentSet();
-
+    const opp = 1 - playerIdx, set = currentSet();
     if (set.tiebreak) {
       set.tbPoints[playerIdx]++;
-      const w = set.tbPoints[playerIdx], l = set.tbPoints[opp];
-      const target = getTBTargetForCurrentSet();
-      if (w>=target && (w-l)>=2) {
-        set.games[playerIdx]++;
-        finishSet(playerIdx, true);
-      }
+      const w = set.tbPoints[playerIdx], l = set.tbPoints[opp], target = getTBTargetForCurrentSet();
+      if (w>=target && (w-l)>=2) { set.games[playerIdx]++; finishSet(playerIdx, true); }
       return;
     }
-
-    const w = state.gamePoints[playerIdx];
-    const l = state.gamePoints[opp];
-    if (w <= 2) {
-      state.gamePoints[playerIdx]++;
-    } else if (w === 3 && l < 3) {
-      gameWonBy(playerIdx);
-    } else if (w === 3 && l === 3) {
-      state.gamePoints[playerIdx] = 4; // Advantage
-    } else if (w === 4) {
-      gameWonBy(playerIdx);
-    } else if (l === 4) {
-      state.gamePoints[opp] = 3; // back to deuce
-    }
+    const w = state.gamePoints[playerIdx], l = state.gamePoints[opp];
+    if (w <= 2) state.gamePoints[playerIdx]++;
+    else if (w === 3 && l < 3) gameWonBy(playerIdx);
+    else if (w === 3 && l === 3) state.gamePoints[playerIdx] = 4;
+    else if (w === 4) gameWonBy(playerIdx);
+    else if (l === 4) state.gamePoints[opp] = 3;
   }
 
   function gameWonBy(playerIdx) {
-    const set = currentSet();
-    set.games[playerIdx]++;
+    const set = currentSet(); set.games[playerIdx]++;
+    const server = state.server, returner = 1 - server;
+    state.players[server].stats.serviceGamesPlayed++; state.players[returner].stats.returnGamesPlayed++;
+    if (playerIdx === server) state.players[server].stats.serviceGamesHeld++; else state.players[returner].stats.breaks++;
 
-    // Service game stats
-    const server = state.server;
-    const returner = 1 - server;
-    state.players[server].stats.serviceGamesPlayed++;
-    state.players[returner].stats.returnGamesPlayed++;
-    if (playerIdx === server) {
-      state.players[server].stats.serviceGamesHeld++;
-    } else {
-      state.players[returner].stats.breaks++;
-    }
+    state.gamePoints = [0,0]; state.server = 1 - state.server;
 
-    // Reset game points & rotate server
-    state.gamePoints = [0,0];
-    state.server = 1 - state.server;
-
-    // Set finished?
-    const w = set.games[playerIdx];
-    const l = set.games[1-playerIdx];
+    const w = set.games[playerIdx], l = set.games[1-playerIdx];
 
     if (state.settings.format === 'pro') {
       if (w===7 && l===7) { set.tiebreak = true; set.tbPoints=[0,0]; set.tbTo=7; return; }
       if (w>=8 && (w-l)>=2) { finishSet(playerIdx, false); }
       return;
     }
-
     if (state.settings.format === 'short') {
-      // TB at 3–3 in sets 1 & 2; deciding set is a TB10 only (created in finishSet)
       if (w===3 && l===3) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; return; }
       if (w>=4 && (w-l)>=2) { finishSet(playerIdx, false); }
       return;
     }
-
-    // Standard format
     const needTB = (w===6 && l===6 && state.settings.tiebreakAtSixSix && (state.settings.finalSetTB || (state.sets.length < state.settings.bestOf)));
     if (needTB) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; return; }
     if (w>=6 && (w-l)>=2) { finishSet(playerIdx, false); }
   }
 
   function finishSet(winnerIdx, viaTB) {
-    // If match finished, do not create a new set
-    const sw = setsWonBy();
-    const need = setsNeededToWin();
+    const sw = setsWonBy(), need = setsNeededToWin();
     if (sw[winnerIdx] >= need) {
-      // Enable end-of-match comments
-      const mc = document.getElementById('matchComments');
-      const hint = document.getElementById('matchCommentsHint');
-      if (mc) mc.disabled = false;
-      if (hint) hint.textContent = 'Match finished — add your final comments.';
+      const mc = document.getElementById('matchComments'); const hint = document.getElementById('matchCommentsHint');
+      if (mc) mc.disabled = false; if (hint) hint.textContent = 'Match finished — add your final comments.';
       return;
     }
-
-    // Otherwise start next set
     if (state.settings.format==='short') {
-      // If now 1–1, start a deciding match tiebreak to 10
       const swn = setsWonBy();
-      if (swn[0]===1 && swn[1]===1) {
-        state.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 });
-        return;
-      }
+      if (swn[0]===1 && swn[1]===1) { state.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 }); return; }
     }
     state.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0] });
   }
 
   // ---------- Point Recording ----------
   function recordPoint(formData) {
+    const formEl = document.getElementById('pointForm');
     const server = +formData.get('pf_server');
-    const serveResult = formData.get('serveResult'); // 1stin | 1stout_2ndin | df
-    const endType = formData.get('endType'); // winner | error
+    const serveResult = formData.get('serveResult'); // radios/select values
+    const endType = formData.get('endType');         // winner | error
     const byPlayer = +formData.get('byPlayer');
-    const category = formData.get('category'); // fh,bh,serve,fhv,bhv,oh
+    const category = formData.get('category');       // fh,bh,serve,fhv,bhv,oh
     const comment = (formData.get('comment')||'').trim();
 
-    // Determine break point BEFORE the rally based on current state
     const breakPoint = isBreakPoint(server);
+    const inferredWinner = getDeclaredWinnerFromForm(formEl);
 
     const point = {
       server,
@@ -483,14 +451,8 @@
       timestamp: Date.now()
     };
 
-    // Infer winner
-    if (serveResult==='df') {
-      point.winner = 1 - server; point.doubleFault = true;
-    } else if (endType==='winner') {
-      point.winner = byPlayer;
-    } else if (endType==='error') {
-      point.winner = 1 - byPlayer;
-    }
+    if (serveResult==='df') { point.winner = 1 - server; point.doubleFault = true; }
+    else { point.winner = inferredWinner; }
 
     applyPoint(point);
   }
@@ -498,19 +460,15 @@
   function applyPoint(point) {
     pushUndo();
 
-    // Update first-serve stats for server
     const sIdx = point.server;
     state.players[sIdx].stats.firstServe.attempts++;
     if (point.serve.firstIn) state.players[sIdx].stats.firstServe.in++;
 
-    // Service/return points played
     state.players[sIdx].stats.servicePointsPlayed++;
     state.players[1-sIdx].stats.returnPointsPlayed++;
 
     const winner = point.winner;
-    const loser = 1 - winner;
 
-    // Break point stats (if this rally started at a break point)
     if (point.breakPoint) {
       const recv = 1 - sIdx;
       state.players[recv].stats.bpEarned++;
@@ -520,124 +478,89 @@
     if (point.doubleFault) {
       state.players[sIdx].stats.doubleFaults++;
       state.players[winner].stats.pointsWon++;
-      if (winner === sIdx) state.players[sIdx].stats.servicePointsWon++;
-      else state.players[1-sIdx].stats.returnPointsWon++;
-
-      // If DF occurred on a break point, it's a conversion for returner
-      if (point.breakPoint && winner !== sIdx) {
-        const recv = 1 - sIdx;
-        state.players[recv].stats.bpConverted++;
-        state.players[sIdx].stats.bpSaved += 0; // no save
-      } else if (point.breakPoint && winner === sIdx) {
-        state.players[sIdx].stats.bpSaved++;
+      if (winner === sIdx) state.players[sIdx].stats.servicePointsWon++; else state.players[1-sIdx].stats.returnPointsWon++;
+      if (point.breakPoint) {
+        if (winner !== sIdx) state.players[1-sIdx].stats.bpConverted++; else state.players[sIdx].stats.bpSaved++;
       }
-
-      pointTo(winner);
-      finalizePoint(point);
-      return;
+      pointTo(winner); finalizePoint(point); return;
     }
 
     if (point.outcome==='winner') {
-      if (point.category==='serve' && winner===sIdx) {
-        state.players[sIdx].stats.aces++;
-      }
+      if (point.category==='serve' && winner===sIdx) state.players[sIdx].stats.aces++;
       state.players[winner].stats.winners[point.category]++;
     } else if (point.outcome==='error') {
       state.players[point.byPlayer].stats.errors[point.category]++;
       if (point.forced) state.players[point.byPlayer].stats.forcedErrors[point.category]++;
     }
 
-    // Points won add
     state.players[winner].stats.pointsWon++;
-    if (winner === sIdx) state.players[sIdx].stats.servicePointsWon++;
-    else state.players[1-sIdx].stats.returnPointsWon++;
+    if (winner === sIdx) state.players[sIdx].stats.servicePointsWon++; else state.players[1-sIdx].stats.returnPointsWon++;
 
-    // If this was a break point, register converted/saved
     if (point.breakPoint) {
-      if (winner !== sIdx) {
-        const recv = 1 - sIdx;
-        state.players[recv].stats.bpConverted++;
-      } else {
-        state.players[sIdx].stats.bpSaved++;
-      }
+      if (winner !== sIdx) state.players[1-sIdx].stats.bpConverted++; else state.players[sIdx].stats.bpSaved++;
     }
 
-    // Score advance
     pointTo(winner);
-
     finalizePoint(point);
   }
 
   function finalizePoint(point) {
-    // Save to history
     state.history.push(point);
-    saveState();
-    renderAll();
+    saveState(); renderAll();
 
-    // Show last point summary
     const n = state.history.length;
     const pName = state.players[point.winner].name;
     const cat = point.category.toUpperCase();
     let sr = point.serve.firstIn ? '1st-in' : (point.serve.secondIn ? '2nd-in' : (point.doubleFault?'DF':'n/a'));
     const bp = point.breakPoint ? ' — BP' : '';
-    document.getElementById('lastPoint').textContent = `#${n}: ${pName} won the point (${point.outcome} – ${cat}; serve: ${sr}${bp})${point.comment?` — ${point.comment}`:''}`;
+    document.getElementById('lastPoint').textContent =
+      `#${n}: ${pName} won the point (${point.outcome} – ${cat}; serve: ${sr}${bp})${point.comment?` — ${point.comment}`:''}`;
 
-    // Clear comment field only
-    const cEl = document.querySelector('[name="comment"]');
-    if (cEl) cEl.value = '';
+    const cEl = document.querySelector('[name="comment"]'); if (cEl) cEl.value = '';
   }
 
   // ---------- Rendering ----------
   function renderAll() {
-    // Defaults for settings
     if (!state.settings) state.settings = { format:'standard', bestOf:3, tiebreakAtSixSix:true, finalSetTB:true };
     if (state.settings.format === undefined) state.settings.format = 'standard';
 
-    // Format controls (radio)
     document.getElementById('formatStd').checked = state.settings.format==='standard';
     document.getElementById('formatPro').checked = state.settings.format==='pro';
     document.getElementById('formatShort').checked = state.settings.format==='short';
     updateFormatUI();
 
-    // Names
     document.getElementById('p0name').value = state.players[0].name;
     document.getElementById('p1name').value = state.players[1].name;
     document.getElementById('server0lbl').textContent = state.players[0].name;
     document.getElementById('server1lbl').textContent = state.players[1].name;
     document.getElementById('pf_server0').textContent = state.players[0].name;
     document.getElementById('pf_server1').textContent = state.players[1].name;
-    const byP0 = document.getElementById('byP0');
-    const byP1 = document.getElementById('byP1');
-    if (byP0) byP0.textContent = state.players[0].name;
-    if (byP1) byP1.textContent = state.players[1].name;
+    const byP0 = document.getElementById('byP0'); const byP1 = document.getElementById('byP1');
+    if (byP0) byP0.textContent = state.players[0].name; if (byP1) byP1.textContent = state.players[1].name;
 
-    // Seed labels
     const seedP0 = document.getElementById('seedP0'); if (seedP0) seedP0.textContent = state.players[0].name;
     const seedP1 = document.getElementById('seedP1'); if (seedP1) seedP1.textContent = state.players[1].name;
     const seedTBP0 = document.getElementById('seedTBP0'); if (seedTBP0) seedTBP0.textContent = state.players[0].name;
     const seedTBP1 = document.getElementById('seedTBP1'); if (seedTBP1) seedTBP1.textContent = state.players[1].name;
 
-    // Standard-only options
     document.getElementById('bestOf').value = String(state.settings.bestOf || 3);
     document.getElementById('tba66').checked = !!state.settings.tiebreakAtSixSix;
     document.getElementById('finalSetTB').checked = !!state.settings.finalSetTB;
 
-    // Server radio
     document.getElementById('server0').checked = state.server===0;
     document.getElementById('server1').checked = state.server===1;
 
-    // Point form default server
-    for (const el of document.querySelectorAll('input[name="pf_server"]')) {
-      el.checked = (+el.value)===state.server;
-    }
+    for (const el of document.querySelectorAll('input[name="pf_server"]')) el.checked = (+el.value)===state.server;
+
     updateDynamicDefaults();
+    updateByWhichLabel();
+    updatePointWinnerPreview();
 
     renderScoreboard();
     renderQuickStats();
     renderDetailedStats();
     renderPointLog();
 
-    // Match comments
     const mc = document.getElementById('matchComments');
     const hint = document.getElementById('matchCommentsHint');
     if (mc && hint) {
@@ -655,25 +578,19 @@
     let html = '<table class="min-w-full text-sm">';
     html += '<thead><tr>';
     html += '<th class="text-left p-2">Player</th>';
-    for (let i=0;i<sets.length;i++) {
-      html += `<th class="p-2 text-center border-l">Set ${i+1}</th>`;
-    }
+    for (let i=0;i<sets.length;i++) html += `<th class="p-2 text-center border-l">Set ${i+1}</th>`;
     html += `<th class="p-2 text-center border-l">Game</th>`;
-    const cs = currentSet();
-    if (cs.tiebreak) html += `<th class="p-2 text-center border-l">Tiebreak</th>`;
+    const cs = currentSet(); if (cs.tiebreak) html += `<th class="p-2 text-center border-l">Tiebreak</th>`;
     html += '</tr></thead>';
 
     const row = (idx) => {
       let r = `<tr class="border-t">`;
       const isServer = state.server===idx ? ' 🔸' : '';
       r += `<td class="p-2 font-medium">${state.players[idx].name}${isServer}</td>`;
-      for (let s of sets) {
-        r += `<td class="p-2 text-center border-l">${s.games[idx]}</td>`;
-      }
+      for (let s of sets) r += `<td class="p-2 text-center border-l">${s.games[idx]}</td>`;
       r += `<td class="p-2 text-center border-l">${asScore(state.gamePoints[idx])}</td>`;
       if (cs.tiebreak) r += `<td class="p-2 text-center border-l">${cs.tbPoints[idx]}</td>`;
-      r += '</tr>';
-      return r;
+      r += '</tr>'; return r;
     };
 
     html += '<tbody>' + row(0) + row(1) + '</tbody></table>';
@@ -686,8 +603,7 @@
     } else if (state.settings.format==='short') {
       hints.textContent = `Short sets to 4 (TB at 3–3). If 1–1 in sets, deciding match tiebreak to 10. Server marked with 🔸.`;
     } else {
-      const bo = state.settings.bestOf;
-      const needToWin = Math.floor(bo/2)+1;
+      const bo = state.settings.bestOf, needToWin = Math.floor(bo/2)+1;
       hints.textContent = `Sets: ${sw[0]}–${sw[1]} (first to ${needToWin}). Server marked with 🔸.`;
     }
   }
@@ -696,16 +612,10 @@
     const qs = document.getElementById('quickStats');
     const card = (idx) => {
       const p = state.players[idx];
-      const fs = p.stats.firstServe;
-      const spw = p.stats.servicePointsWon;
-      const spp = p.stats.servicePointsPlayed;
-      const rpw = p.stats.returnPointsWon;
-      const rpp = p.stats.returnPointsPlayed;
-      const holds = p.stats.serviceGamesHeld;
-      const sGP = p.stats.serviceGamesPlayed;
-      const breaks = p.stats.breaks;
-      const bpE = p.stats.bpEarned, bpC = p.stats.bpConverted;
-      const bpF = p.stats.bpFaced,  bpS = p.stats.bpSaved;
+      const fs = p.stats.firstServe, spw = p.stats.servicePointsWon, spp = p.stats.servicePointsPlayed;
+      const rpw = p.stats.returnPointsWon, rpp = p.stats.returnPointsPlayed;
+      const holds = p.stats.serviceGamesHeld, sGP = p.stats.serviceGamesPlayed, breaks = p.stats.breaks;
+      const bpE = p.stats.bpEarned, bpC = p.stats.bpConverted, bpF = p.stats.bpFaced, bpS = p.stats.bpSaved;
       return `
       <div class="rounded-2xl border p-4">
         <div class="font-semibold mb-1">${p.name}</div>
@@ -728,10 +638,8 @@
   function renderDetailedStats() {
     const container = document.getElementById('detailedStats');
     const block = (idx) => {
-      const p = state.players[idx];
-      const W = p.stats.winners, E = p.stats.errors, F = p.stats.forcedErrors;
-      const netW = W.fhv + W.bhv + W.oh;
-      const netE = E.fhv + E.bhv + E.oh;
+      const p = state.players[idx], W = p.stats.winners, E = p.stats.errors, F = p.stats.forcedErrors;
+      const netW = W.fhv + W.bhv + W.oh, netE = E.fhv + E.bhv + E.oh;
       return `
       <div class="rounded-2xl border p-4">
         <div class="font-semibold mb-3">${p.name}</div>
@@ -771,7 +679,7 @@
     const rows = state.history.map((p, i) => {
       const winner = state.players[p.winner].name;
       const by = state.players[p.byPlayer].name;
-      let serveTxt = p.serve.firstIn? '1st-in' : p.serve.secondIn? '2nd-in' : p.doubleFault? 'DF' : 'n/a';
+      const serveTxt = p.serve.firstIn? '1st-in' : p.serve.secondIn? '2nd-in' : p.doubleFault? 'DF' : 'n/a';
       const cat = p.category.toUpperCase();
       const forced = p.outcome==='error' ? (p.forced? ' (forced)' : ' (unforced)') : '';
       const bp = p.breakPoint ? ' • BP' : '';
@@ -788,40 +696,30 @@
 
   // ---------- Dynamic defaults for point form ----------
   function updateDynamicDefaults() {
-    const form = document.getElementById('pointForm');
-    if (!form) return;
-    const sRadio = form.querySelector('input[name="pf_server"]:checked');
-    if (!sRadio) return;
-    const sIdx = +sRadio.value;
-    const rIdx = 1 - sIdx;
+    const form = document.getElementById('pointForm'); if (!form) return;
+    const sRadio = form.querySelector('input[name="pf_server"]:checked'); if (!sRadio) return;
+    const sIdx = +sRadio.value, rIdx = 1 - sIdx;
     const endTypeEl = form.querySelector('input[name="endType"]:checked');
     const endType = endTypeEl ? endTypeEl.value : 'winner';
     const bySel = form.querySelector('select[name="byPlayer"]');
     const catSel = form.querySelector('select[name="category"]');
 
-    if (endType === 'winner') {
-      if (bySel) bySel.value = String(sIdx);
-      if (catSel) catSel.value = 'serve';
-    } else if (endType === 'error') {
-      if (bySel) bySel.value = String(rIdx);
-    }
+    if (endType === 'winner') { if (bySel) bySel.value = String(sIdx); if (catSel) catSel.value = 'serve'; }
+    else if (endType === 'error') { if (bySel) bySel.value = String(rIdx); }
   }
 
   function updateFormatUI() {
     const std = document.getElementById('formatStd').checked;
     const pro = document.getElementById('formatPro').checked;
-    const sh = document.getElementById('formatShort').checked;
+    const sh  = document.getElementById('formatShort').checked;
     const stdOpts = document.getElementById('stdOpts');
 
     if (std) state.settings.format = 'standard';
     else if (pro) state.settings.format = 'pro';
     else if (sh) state.settings.format = 'short';
 
-    // Enable/disable standard-only options
     stdOpts.style.opacity = std ? '1' : '0.5';
-    for (const sel of stdOpts.querySelectorAll('select, input[type="checkbox"]')) {
-      sel.disabled = !std;
-    }
+    for (const sel of stdOpts.querySelectorAll('select, input[type="checkbox"]')) sel.disabled = !std;
   }
 
   // ---------- Exports ----------
@@ -829,18 +727,13 @@
     const a = document.createElement('a');
     a.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
     a.setAttribute('download', filename);
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.style.display = 'none'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }
-
   function exportJSON() { download('tennis_match.json', JSON.stringify(state, null, 2)); }
 
   function exportCSV() {
     const lines = [];
     lines.push(['point','server','firstServeIn','secondServeIn','doubleFault','winner','byPlayer','outcome','category','forced','breakPoint','comment','setIdx','gamesP0','gamesP1','tb','tbP0','tbP1'].join(','));
-    // To reconstruct set/game at time of point, simulate through history
     const sim = newMatchState();
     sim.players[0].name = state.players[0].name; sim.players[1].name = state.players[1].name;
     sim.settings = deepClone(state.settings);
@@ -848,7 +741,6 @@
 
     for (let i=0;i<state.history.length;i++) {
       const p = state.history[i];
-      // snapshot before applying point
       const cs = sim.sets[sim.sets.length-1];
       lines.push([
         i+1,
@@ -868,19 +760,16 @@
         cs.tiebreak?1:0,
         cs.tbPoints[0], cs.tbPoints[1]
       ].join(','));
-      // apply to sim
       applyPointSim(sim, p);
     }
     download('tennis_points.csv', lines.join('\n'));
   }
 
   function applyPointSim(sim, point) {
-    // minimal version of applyPoint for export simulation
     sim.players[point.server].stats.firstServe.attempts++;
     if (point.serve.firstIn) sim.players[point.server].stats.firstServe.in++;
 
     const winner = point.doubleFault ? (1 - point.server) : point.winner;
-
     const set = sim.sets[sim.sets.length-1];
     function tbTarget(){ if (set.tbTo) return set.tbTo; if (sim.settings.format==='short' && sim.sets.length===3) return 10; return 7; }
 
@@ -888,14 +777,12 @@
       const opp = 1 - playerIdx;
       if (set.tiebreak) {
         set.tbPoints[playerIdx]++;
-        const w = set.tbPoints[playerIdx], l = set.tbPoints[opp];
-        const target = tbTarget();
+        const w = set.tbPoints[playerIdx], l = set.tbPoints[opp], target = tbTarget();
         if (w>=target && (w-l)>=2) {
           set.games[playerIdx]++;
-          // decide next set
           const need = (sim.settings.format==='pro'?1:(sim.settings.format==='short'?3:sim.settings.bestOf));
           const sw = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
-          if (sw[playerIdx] >= Math.floor(need/2)+1) return; // match over
+          if (sw[playerIdx] >= Math.floor(need/2)+1) return;
           if (sim.settings.format==='short') {
             const swn = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
             if (swn[0]===1 && swn[1]===1) { sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 }); return; }
@@ -903,13 +790,10 @@
           sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0] });
         }
       } else {
-        const w = sim.gamePoints[playerIdx];
-        const l = sim.gamePoints[opp];
+        const w = sim.gamePoints[playerIdx], l = sim.gamePoints[opp];
         if (w <= 2) sim.gamePoints[playerIdx]++;
         else if (w===3 && l<3) {
-          set.games[playerIdx]++;
-          sim.gamePoints=[0,0];
-          sim.server = 1 - sim.server;
+          set.games[playerIdx]++; sim.gamePoints=[0,0]; sim.server = 1 - sim.server;
           const gw = set.games[playerIdx], gl = set.games[opp];
           if (sim.settings.format==='pro') {
             if (gw===7 && gl===7) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
@@ -929,9 +813,7 @@
           }
         } else if (w===3 && l===3) sim.gamePoints[playerIdx]=4;
         else if (w===4) {
-          set.games[playerIdx]++;
-          sim.gamePoints=[0,0];
-          sim.server = 1 - sim.server;
+          set.games[playerIdx]++; sim.gamePoints=[0,0]; sim.server = 1 - sim.server;
           const gw = set.games[playerIdx], gl = set.games[opp];
           if (sim.settings.format==='pro') {
             if (gw===7 && gl===7) { set.tiebreak=true; set.tbPoints=[0,0]; set.tbTo=7; }
@@ -941,7 +823,7 @@
             else if (gw>=4 && (gw-gl)>=2) {
               const swn2 = (function(){ const w=[0,0]; for (const s of sim.sets) { if (s.games[0]>s.games[1]) w[0]++; else if (s.games[1]>s.games[0]) w[1]++; } return w; })();
               if (!(swn2[playerIdx] >= 2)) {
-                if (swn2[0]===1 && swn2[1]===1) sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo:10 });
+                if (swn2[0]===1 && swn2[1]===1) sim.sets.push({ games:[0,0], tiebreak:true, tbPoints:[0,0], tbTo=10 });
                 else sim.sets.push({ games:[0,0], tiebreak:false, tbPoints:[0,0]});
               }
             }
@@ -952,7 +834,6 @@
         } else if (l===4) sim.gamePoints[opp]=3;
       }
     };
-
     pointTo(winner);
   }
 
@@ -960,24 +841,18 @@
   document.getElementById('btnUndo').addEventListener('click', () => undo());
   document.getElementById('btnNewMatch').addEventListener('click', () => {
     if (!confirm('Start a new match and clear current data?')) return;
-    pushUndo();
-    state = newMatchState();
-    saveState();
-    renderAll();
+    pushUndo(); state = newMatchState(); saveState(); renderAll();
   });
 
   document.getElementById('p0name').addEventListener('input', (e)=>{ state.players[0].name=e.target.value; saveState(); renderAll(); });
   document.getElementById('p1name').addEventListener('input', (e)=>{ state.players[1].name=e.target.value; saveState(); renderAll(); });
 
-  // Format radios + standard options
   document.getElementById('formatStd').addEventListener('change', ()=>{ updateFormatUI(); saveState(); renderAll(); });
   document.getElementById('formatPro').addEventListener('change', ()=>{ updateFormatUI(); saveState(); renderAll(); });
   document.getElementById('formatShort').addEventListener('change', ()=>{ updateFormatUI(); saveState(); renderAll(); });
 
   document.getElementById('bestOf').addEventListener('change', (e)=>{
-    state.settings.bestOf=+e.target.value;
-    state.settings.format='standard';
-    saveState(); renderAll();
+    state.settings.bestOf=+e.target.value; state.settings.format='standard'; saveState(); renderAll();
   });
   document.getElementById('tba66').addEventListener('change', (e)=>{ state.settings.tiebreakAtSixSix=!!e.target.checked; saveState(); renderAll(); });
   document.getElementById('finalSetTB').addEventListener('change', (e)=>{ state.settings.finalSetTB=!!e.target.checked; saveState(); renderAll(); });
@@ -993,14 +868,10 @@
     document.getElementById('seedTBRow').classList.toggle('hidden', !e.target.checked);
   });
   document.getElementById('btnApplySeed').addEventListener('click', ()=>{
-    // Parse completed sets like "6-4, 3-6"
     function parseSets(txt){
-      const out=[];
-      (txt||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(p=>{
-        const m = p.match(/^(\d+)\s*[-–]\s*(\d+)$/);
-        if (m){ out.push([+m[1], +m[2]]); }
-      });
-      return out;
+      const out=[]; (txt||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(p=>{
+        const m = p.match(/^(\d+)\s*[-–]\s*(\d+)$/); if (m){ out.push([+m[1], +m[2]]); }
+      }); return out;
     }
     const completed = parseSets(document.getElementById('seedSets').value);
     const g0 = +document.getElementById('seedGames0').value || 0;
@@ -1010,61 +881,45 @@
     const tb1 = +document.getElementById('seedTB1').value || 0;
 
     pushUndo();
-
     state.sets = completed.map(g=>({ games:[g[0], g[1]], tiebreak:false, tbPoints:[0,0] }));
     state.sets.push({ games:[g0,g1], tiebreak:inTB, tbPoints:[tb0,tb1] });
-    delete state.sets[state.sets.length-1].tbTo; // will be inferred by format logic
+    delete state.sets[state.sets.length-1].tbTo;
     state.gamePoints = [0,0];
-    saveState();
-    renderAll();
-    alert('Starting score applied.');
+    saveState(); renderAll(); alert('Starting score applied.');
   });
 
-  // Point form interactions
+  // Point form
   document.getElementById('pointForm').addEventListener('change', (e)=>{
     if (e.target.name==='endType') {
       document.getElementById('forcedWrap').classList.toggle('hidden', e.target.value!=='error');
     }
     updateDynamicDefaults();
+    updateByWhichLabel();
+    updatePointWinnerPreview();
   });
-
   document.getElementById('pointForm').addEventListener('submit', (e)=>{
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    recordPoint(fd);
+    e.preventDefault(); const fd = new FormData(e.target); recordPoint(fd);
   });
-
   document.getElementById('btnClearComment').addEventListener('click', ()=>{
-    const c = document.querySelector('[name="comment"]');
-    if (c) c.value='';
+    const c = document.querySelector('[name="comment"]'); if (c) c.value='';
   });
 
   // Export / Import
   document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
   document.getElementById('btnExportJSON').addEventListener('click', exportJSON);
   document.getElementById('inputImportJSON').addEventListener('change', async (e)=>{
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     try {
-      const txt = await file.text();
-      const obj = JSON.parse(txt);
+      const txt = await file.text(); const obj = JSON.parse(txt);
       if (!obj || !obj.players || !obj.sets) throw new Error('Invalid file.');
-      pushUndo();
-      state = obj;
-      saveState();
-      renderAll();
-      alert('Import successful.');
-    } catch(err) {
-      alert('Import failed: '+err.message);
-    } finally {
-      e.target.value = '';
-    }
+      pushUndo(); state = obj; saveState(); renderAll(); alert('Import successful.');
+    } catch(err) { alert('Import failed: '+err.message); }
+    finally { e.target.value = ''; }
   });
 
-  // Match comments save-on-input
+  // End-of-match comments save-on-input
   document.getElementById('matchComments').addEventListener('input', (e)=>{
-    state.matchComments = e.target.value;
-    saveState();
+    state.matchComments = e.target.value; saveState();
   });
 
   // Initial render
