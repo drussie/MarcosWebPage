@@ -13,20 +13,24 @@
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2/hammer.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    body { margin: 0; font-family: -apple-system, Arial, sans-serif; background: #1F2A44; color: white; }
+    html, body { margin: 0; padding: 0; font-family: -apple-system, Arial, sans-serif; background: #1F2A44; color: white; width: 100%; height: 100%; }
+    #app-root { width: 100%; min-height: 100vh; display: flex; flex-direction: column; }
     .video-container { position: relative; width: 100%; max-height: 70vh; overflow: hidden; background: #000; }
-    #canvas { position: absolute; top: 0; left: 0; cursor: crosshair; }
-    .toolbar { position: fixed; bottom: 0; width: 100%; background: rgba(31, 42, 68, 0.9); padding: 1rem; backdrop-filter: blur(10px); }
-    .toolbar button { min-width: 60px; margin: 0 5px; transition: background 0.2s; }
+    #canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
+    .toolbar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(31, 42, 68, 0.9); padding: 1rem; backdrop-filter: blur(10px); z-index: 10; }
+    .toolbar button { min-width: 60px; margin: 0 5px; background: #007AFF; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; transition: background 0.2s; touch-action: manipulation; }
     .toolbar button.active { background: #0056b3; }
     .seek-bar { width: 100%; accent-color: #007AFF; margin: 1rem 0; }
     .zoom-controls { position: fixed; top: 10px; right: 10px; display: flex; gap: 0.5rem; z-index: 10; }
     .fade-in { animation: fadeIn 0.3s ease-in; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    #rr-container { width: 100% !important; max-width: 100% !important; min-height: 100vh !important; padding: 16px !important; box-sizing: border-box; }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="app-root">
+    <div id="root"></div>
+  </div>
   <script type="text/babel">
     const { useRef, useState, useEffect } = React;
 
@@ -40,69 +44,83 @@
       const [scale, setScale] = useState(1);
       const [anglePoints, setAnglePoints] = useState([]);
       const [poseData, setPoseData] = useState(null);
+      const [error, setError] = useState(null);
 
       useEffect(() => {
-        const canvas = new fabric.Canvas(canvasRef.current, { backgroundColor: 'transparent' });
-        setFabricCanvas(canvas);
+        try {
+          const canvas = new fabric.Canvas(canvasRef.current, { backgroundColor: 'transparent' });
+          setFabricCanvas(canvas);
 
-        const handleLoaded = () => {
-          const vid = videoRef.current;
-          if (vid.videoWidth) {
-            canvas.setDimensions({ width: vid.videoWidth, height: vid.videoHeight });
-            canvasRef.current.width = vid.videoWidth;
-            canvasRef.current.height = vid.videoHeight;
-          }
-        };
-        videoRef.current?.addEventListener('loadedmetadata', handleLoaded);
-
-        const hammer = new Hammer.Manager(canvasRef.current);
-        const pinch = new Hammer.PinchRecognizer();
-        pinch.recognizeWith(hammer);
-        hammer.on('pinch', (e) => {
-          const newScale = Math.min(Math.max(scale * e.scale, 1), 5);
-          setScale(newScale);
-          canvas.setZoom(newScale);
-        });
-
-        canvas.on('mouse:down', (opt) => {
-          if (!videoRef.current?.paused) videoRef.current.pause();
-          const ptr = opt.absolutePointer || { x: 0, y: 0 };
-
-          if (tool === 'angle') {
-            const points = [...anglePoints, ptr];
-            setAnglePoints(points);
-            if (points.length === 3) {
-              const [p1, p2, p3] = points;
-              const angle = Math.abs(
-                Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x)
-              ) * (180 / Math.PI);
-              canvas.add(new fabric.Line([p1.x, p1.y, p2.x, p2.y], { stroke: '#FF0000', strokeWidth: 2 }));
-              canvas.add(new fabric.Line([p2.x, p2.y, p3.x, p3.y], { stroke: '#FF0000', strokeWidth: 2 }));
-              canvas.add(new fabric.Text(`${angle.toFixed(1)}°`, { left: p2.x, top: p2.y - 20, fill: '#FFF', fontSize: 12 }));
-              setAnglePoints([]);
+          const handleLoaded = () => {
+            const vid = videoRef.current;
+            if (vid.videoWidth) {
+              canvas.setDimensions({ width: vid.videoWidth, height: vid.videoHeight });
+              canvasRef.current.width = vid.videoWidth;
+              canvasRef.current.height = vid.videoHeight;
             }
-          } else if (tool === 'line') {
-            const start = ptr;
-            canvas.on('mouse:up', (upOpt) => {
-              const end = upOpt.absolutePointer || start;
-              canvas.add(new fabric.Line([start.x, start.y, end.x, end.y], { stroke: '#00FF00', strokeWidth: 2 }));
-              canvas.off('mouse:up');
-            });
-          } else if (tool === 'circle') {
-            const circle = new fabric.Circle({ left: ptr.x - 20, top: ptr.y - 20, radius: 20, stroke: '#FFFF00', strokeWidth: 2, fill: 'transparent' });
-            canvas.add(circle);
-          }
-        });
+          };
+          videoRef.current?.addEventListener('loadedmetadata', handleLoaded);
 
-        canvas.on('path:created', (opt) => {
-          if (tool === 'draw') opt.path.set({ stroke: '#0000FF', strokeWidth: 3 });
-        });
+          const handleResize = () => {
+            if (videoRef.current?.videoWidth) {
+              canvas.setDimensions({ width: videoRef.current.videoWidth, height: videoRef.current.videoHeight });
+              canvasRef.current.width = videoRef.current.videoWidth;
+              canvasRef.current.height = videoRef.current.videoHeight;
+            }
+          };
+          window.addEventListener('resize', handleResize);
 
-        return () => {
-          canvas.dispose();
-          hammer.destroy();
-          videoRef.current?.removeEventListener('loadedmetadata', handleLoaded);
-        };
+          const hammer = new Hammer.Manager(canvasRef.current);
+          hammer.add(new Hammer.Pinch({ enable: true }));
+          hammer.on('pinch', (e) => {
+            const newScale = Math.min(Math.max(scale * e.scale, 1), 5);
+            setScale(newScale);
+            canvas.setZoom(newScale);
+          });
+
+          canvas.on('mouse:down', (opt) => {
+            if (!videoRef.current?.paused) videoRef.current.pause();
+            const ptr = opt.absolutePointer || { x: 0, y: 0 };
+
+            if (tool === 'angle') {
+              const points = [...anglePoints, ptr];
+              setAnglePoints(points);
+              if (points.length === 3) {
+                const [p1, p2, p3] = points;
+                const angle = Math.abs(
+                  Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x)
+                ) * (180 / Math.PI);
+                canvas.add(new fabric.Line([p1.x, p1.y, p2.x, p2.y], { stroke: '#FF0000', strokeWidth: 2 }));
+                canvas.add(new fabric.Line([p2.x, p2.y, p3.x, p3.y], { stroke: '#FF0000', strokeWidth: 2 }));
+                canvas.add(new fabric.Text(`${angle.toFixed(1)}°`, { left: p2.x, top: p2.y - 20, fill: '#FFF', fontSize: 12 }));
+                setAnglePoints([]);
+              }
+            } else if (tool === 'line') {
+              const start = ptr;
+              canvas.on('mouse:up', (upOpt) => {
+                const end = upOpt.absolutePointer || start;
+                canvas.add(new fabric.Line([start.x, start.y, end.x, end.y], { stroke: '#00FF00', strokeWidth: 2 }));
+                canvas.off('mouse:up');
+              });
+            } else if (tool === 'circle') {
+              const circle = new fabric.Circle({ left: ptr.x - 20, top: ptr.y - 20, radius: 20, stroke: '#FFFF00', strokeWidth: 2, fill: 'transparent' });
+              canvas.add(circle);
+            }
+          });
+
+          canvas.on('path:created', (opt) => {
+            if (tool === 'draw') opt.path.set({ stroke: '#0000FF', strokeWidth: 3 });
+          });
+
+          return () => {
+            canvas.dispose();
+            hammer.destroy();
+            videoRef.current?.removeEventListener('loadedmetadata', handleLoaded);
+            window.removeEventListener('resize', handleResize);
+          };
+        } catch (e) {
+          setError(`Init error: ${e.message}`);
+        }
       }, [tool, scale, anglePoints]);
 
       const runPose = () => {
@@ -138,17 +156,22 @@
         setTool(newTool);
         if (fabricCanvas) {
           fabricCanvas.isDrawingMode = newTool === 'draw';
-          if (newTool !== 'draw') fabricCanvas.selection = false;
+          fabricCanvas.selection = newTool !== 'draw';
           if (newTool !== 'pose') fabricCanvas.clear();
         }
       };
 
       const handleVideoCapture = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          videoRef.current.src = URL.createObjectURL(file);
-          videoRef.current.load();
-          setPoseData(null);
+        try {
+          const file = e.target.files[0];
+          if (file) {
+            videoRef.current.src = URL.createObjectURL(file);
+            videoRef.current.load();
+            setPoseData(null);
+            setError(null);
+          }
+        } catch (e) {
+          setError(`Video load error: ${e.message}`);
         }
       };
 
@@ -161,17 +184,22 @@
       };
 
       const exportFrame = () => {
-        if (fabricCanvas) {
-          const dataURL = fabricCanvas.toDataURL({ format: 'png' });
-          const link = document.createElement('a');
-          link.href = dataURL;
-          link.download = 'stroke_analysis.png';
-          link.click();
+        try {
+          if (fabricCanvas) {
+            const dataURL = fabricCanvas.toDataURL({ format: 'png', multiplier: 2 });
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = 'stroke_analysis.png';
+            link.click();
+          }
+        } catch (e) {
+          setError(`Export error: ${e.message}`);
         }
       };
 
       return (
-        <div className="min-h-screen">
+        <div className="flex flex-col w-full">
+          {error && <div className="p-4 text-red-500 text-center">{error}</div>}
           <div className="p-4 text-center fade-in">
             <h1 className="text-2xl font-bold mb-2">Sports Stroke Form 🎾💪</h1>
             <label className="bg-gray-700 p-2 rounded mb-2 inline-block">
@@ -179,7 +207,7 @@
             </label>
             <button onClick={exportFrame} className="ml-2 bg-green-500 rounded px-4 py-2">Export Frame</button>
           </div>
-          <div className="video-container mx-auto" style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}>
+          <div className="video-container mx-auto">
             <video ref={videoRef} controls className="w-full" onLoadedMetadata={handleLoadedMetadata} onTimeUpdate={handleTimeUpdate} />
             <canvas ref={canvasRef} className="w-full" />
           </div>
