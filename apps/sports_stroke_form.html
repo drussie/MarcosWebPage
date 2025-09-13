@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Tennis Video Analyzer</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fabric@5/dist/fabric.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2/hammer.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: -apple-system, Arial, sans-serif; }
+    .video-container { position: relative; width: 100%; max-height: 70vh; overflow: hidden; }
+    #canvas { position: absolute; top: 0; left: 0; }
+    .toolbar { position: fixed; bottom: 0; width: 100%; background: #1F2A44; padding: 1rem; }
+    .seek-bar { width: 100%; accent-color: #007AFF; }
+    button { background: #007AFF; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useRef, useState, useEffect } = React;
+
+    const App = () => {
+      const videoRef = useRef(null);
+      const canvasRef = useRef(null);
+      const [currentTime, setCurrentTime] = useState(0);
+      const [fabricCanvas, setFabricCanvas] = useState(null);
+      const [tool, setTool] = useState(null);
+
+      useEffect(() => {
+        const canvas = new fabric.Canvas(canvasRef.current);
+        setFabricCanvas(canvas);
+        return () => canvas.dispose();
+      }, []);
+
+      const handleVideoUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          videoRef.current.src = URL.createObjectURL(file);
+          videoRef.current.load();
+        }
+      };
+
+      const handleSeek = (e) => {
+        const time = e.target.value;
+        videoRef.current.currentTime = time;
+        setCurrentTime(time);
+      };
+
+      const toggleTool = (selectedTool) => {
+        setTool(selectedTool);
+        if (fabricCanvas) {
+          fabricCanvas.isDrawingMode = selectedTool === 'draw';
+          // Add more tool logic (angle, line, circle) here
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
+          <div className="p-4">
+            <h1 className="text-2xl font-bold">Tennis Video Analyzer</h1>
+            <input type="file" accept="video/*" onChange={handleVideoUpload} className="my-2" />
+          </div>
+          <div className="video-container">
+            <video
+              ref={videoRef}
+              controls
+              className="w-full"
+              onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
+            />
+            <canvas ref={canvasRef} className="w-full" />
+          </div>
+          <input
+            type="range"
+            min="0"
+            max={videoRef.current?.duration || 0}
+            value={currentTime}
+            onChange={handleSeek}
+            className="seek-bar"
+          />
+          <div className="toolbar flex justify-around">
+            <button onClick={() => toggleTool('angle')}>Angle</button>
+            <button onClick={() => toggleTool('line')}>Line</button>
+            <button onClick={() => toggleTool('draw')}>Draw</button>
+            <button onClick={() => toggleTool('circle')}>Circle</button>
+            <button onClick={() => toggleTool('pose')}>Pose</button>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>

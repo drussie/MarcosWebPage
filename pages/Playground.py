@@ -192,7 +192,8 @@ apps = {
     "Mortgage Calculator": "apps/mortgage_calculator.html",
     "Car Loan Calculator": "apps/car_loan_calculator.html",
     "Tennis Score & Stats Tracker": "apps/tennis_tracker.html",
-    "Asteroids": "apps/asteroids.html"
+    "Asteroids": "apps/asteroids.html",
+    "Sports Stroke Form": "apps/sports_stroke_form.html"
 }
 selected_app = st.selectbox("Select an app to run", list(apps.keys()))
 
