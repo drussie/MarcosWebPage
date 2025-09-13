@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Tennis Video Analyzer</title>
+  <meta name="theme-color" content="#1F2A44">
+  <title>Sports Stroke Form 🎾💪</title>
   <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
@@ -12,12 +13,16 @@
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2/hammer.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    body { margin: 0; font-family: -apple-system, Arial, sans-serif; }
-    .video-container { position: relative; width: 100%; max-height: 70vh; overflow: hidden; }
-    #canvas { position: absolute; top: 0; left: 0; }
-    .toolbar { position: fixed; bottom: 0; width: 100%; background: #1F2A44; padding: 1rem; }
-    .seek-bar { width: 100%; accent-color: #007AFF; }
-    button { background: #007AFF; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; }
+    body { margin: 0; font-family: -apple-system, Arial, sans-serif; background: #1F2A44; color: white; }
+    .video-container { position: relative; width: 100%; max-height: 70vh; overflow: hidden; background: #000; }
+    #canvas { position: absolute; top: 0; left: 0; cursor: crosshair; }
+    .toolbar { position: fixed; bottom: 0; width: 100%; background: rgba(31, 42, 68, 0.9); padding: 1rem; backdrop-filter: blur(10px); }
+    .toolbar button { min-width: 60px; margin: 0 5px; transition: background 0.2s; }
+    .toolbar button.active { background: #0056b3; }
+    .seek-bar { width: 100%; accent-color: #007AFF; margin: 1rem 0; }
+    .zoom-controls { position: fixed; top: 10px; right: 10px; display: flex; gap: 0.5rem; z-index: 10; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body>
@@ -29,66 +34,166 @@
       const videoRef = useRef(null);
       const canvasRef = useRef(null);
       const [currentTime, setCurrentTime] = useState(0);
+      const [duration, setDuration] = useState(0);
       const [fabricCanvas, setFabricCanvas] = useState(null);
       const [tool, setTool] = useState(null);
+      const [scale, setScale] = useState(1);
+      const [anglePoints, setAnglePoints] = useState([]);
+      const [poseData, setPoseData] = useState(null);
 
       useEffect(() => {
-        const canvas = new fabric.Canvas(canvasRef.current);
+        const canvas = new fabric.Canvas(canvasRef.current, { backgroundColor: 'transparent' });
         setFabricCanvas(canvas);
-        return () => canvas.dispose();
-      }, []);
 
-      const handleVideoUpload = (e) => {
+        const handleLoaded = () => {
+          const vid = videoRef.current;
+          if (vid.videoWidth) {
+            canvas.setDimensions({ width: vid.videoWidth, height: vid.videoHeight });
+            canvasRef.current.width = vid.videoWidth;
+            canvasRef.current.height = vid.videoHeight;
+          }
+        };
+        videoRef.current?.addEventListener('loadedmetadata', handleLoaded);
+
+        const hammer = new Hammer.Manager(canvasRef.current);
+        const pinch = new Hammer.PinchRecognizer();
+        pinch.recognizeWith(hammer);
+        hammer.on('pinch', (e) => {
+          const newScale = Math.min(Math.max(scale * e.scale, 1), 5);
+          setScale(newScale);
+          canvas.setZoom(newScale);
+        });
+
+        canvas.on('mouse:down', (opt) => {
+          if (!videoRef.current?.paused) videoRef.current.pause();
+          const ptr = opt.absolutePointer || { x: 0, y: 0 };
+
+          if (tool === 'angle') {
+            const points = [...anglePoints, ptr];
+            setAnglePoints(points);
+            if (points.length === 3) {
+              const [p1, p2, p3] = points;
+              const angle = Math.abs(
+                Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x)
+              ) * (180 / Math.PI);
+              canvas.add(new fabric.Line([p1.x, p1.y, p2.x, p2.y], { stroke: '#FF0000', strokeWidth: 2 }));
+              canvas.add(new fabric.Line([p2.x, p2.y, p3.x, p3.y], { stroke: '#FF0000', strokeWidth: 2 }));
+              canvas.add(new fabric.Text(`${angle.toFixed(1)}°`, { left: p2.x, top: p2.y - 20, fill: '#FFF', fontSize: 12 }));
+              setAnglePoints([]);
+            }
+          } else if (tool === 'line') {
+            const start = ptr;
+            canvas.on('mouse:up', (upOpt) => {
+              const end = upOpt.absolutePointer || start;
+              canvas.add(new fabric.Line([start.x, start.y, end.x, end.y], { stroke: '#00FF00', strokeWidth: 2 }));
+              canvas.off('mouse:up');
+            });
+          } else if (tool === 'circle') {
+            const circle = new fabric.Circle({ left: ptr.x - 20, top: ptr.y - 20, radius: 20, stroke: '#FFFF00', strokeWidth: 2, fill: 'transparent' });
+            canvas.add(circle);
+          }
+        });
+
+        canvas.on('path:created', (opt) => {
+          if (tool === 'draw') opt.path.set({ stroke: '#0000FF', strokeWidth: 3 });
+        });
+
+        return () => {
+          canvas.dispose();
+          hammer.destroy();
+          videoRef.current?.removeEventListener('loadedmetadata', handleLoaded);
+        };
+      }, [tool, scale, anglePoints]);
+
+      const runPose = () => {
+        if (!videoRef.current.paused) videoRef.current.pause();
+        const w = videoRef.current.videoWidth || 640;
+        const h = videoRef.current.videoHeight || 480;
+        const mockKeypoints = {
+          shoulder_r: [w * 0.3, h * 0.2], elbow_r: [w * 0.2, h * 0.4], wrist_r: [w * 0.1, h * 0.6],
+          shoulder_l: [w * 0.7, h * 0.2], elbow_l: [w * 0.8, h * 0.4], wrist_l: [w * 0.9, h * 0.6],
+          hip_r: [w * 0.3, h * 0.7], knee_r: [w * 0.2, h * 0.9],
+          hip_l: [w * 0.7, h * 0.7], knee_l: [w * 0.8, h * 0.9],
+        };
+        setPoseData(mockKeypoints);
+        if (fabricCanvas) {
+          fabricCanvas.clear();
+          const lines = [
+            ['shoulder_r', 'elbow_r'], ['elbow_r', 'wrist_r'],
+            ['shoulder_l', 'elbow_l'], ['elbow_l', 'wrist_l'],
+            ['hip_r', 'knee_r'], ['hip_l', 'knee_l']
+          ];
+          lines.forEach(([p1, p2]) => {
+            fabricCanvas.add(new fabric.Line([
+              mockKeypoints[p1][0], mockKeypoints[p1][1],
+              mockKeypoints[p2][0], mockKeypoints[p2][1]
+            ], { stroke: '#00FF00', strokeWidth: 2, selectable: false }));
+          });
+          fabricCanvas.renderAll();
+        }
+      };
+
+      const toggleTool = (selectedTool) => {
+        const newTool = tool === selectedTool ? null : selectedTool;
+        setTool(newTool);
+        if (fabricCanvas) {
+          fabricCanvas.isDrawingMode = newTool === 'draw';
+          if (newTool !== 'draw') fabricCanvas.selection = false;
+          if (newTool !== 'pose') fabricCanvas.clear();
+        }
+      };
+
+      const handleVideoCapture = (e) => {
         const file = e.target.files[0];
         if (file) {
           videoRef.current.src = URL.createObjectURL(file);
           videoRef.current.load();
+          setPoseData(null);
         }
       };
 
+      const handleLoadedMetadata = (e) => setDuration(e.target.duration);
+      const handleTimeUpdate = (e) => setCurrentTime(e.target.currentTime);
       const handleSeek = (e) => {
-        const time = e.target.value;
+        const time = parseFloat(e.target.value);
         videoRef.current.currentTime = time;
         setCurrentTime(time);
       };
 
-      const toggleTool = (selectedTool) => {
-        setTool(selectedTool);
+      const exportFrame = () => {
         if (fabricCanvas) {
-          fabricCanvas.isDrawingMode = selectedTool === 'draw';
-          // Add more tool logic (angle, line, circle) here
+          const dataURL = fabricCanvas.toDataURL({ format: 'png' });
+          const link = document.createElement('a');
+          link.href = dataURL;
+          link.download = 'stroke_analysis.png';
+          link.click();
         }
       };
 
       return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
-          <div className="p-4">
-            <h1 className="text-2xl font-bold">Tennis Video Analyzer</h1>
-            <input type="file" accept="video/*" onChange={handleVideoUpload} className="my-2" />
+        <div className="min-h-screen">
+          <div className="p-4 text-center fade-in">
+            <h1 className="text-2xl font-bold mb-2">Sports Stroke Form 🎾💪</h1>
+            <label className="bg-gray-700 p-2 rounded mb-2 inline-block">
+              Capture Video: <input type="file" accept="video/*" capture="environment" onChange={handleVideoCapture} />
+            </label>
+            <button onClick={exportFrame} className="ml-2 bg-green-500 rounded px-4 py-2">Export Frame</button>
           </div>
-          <div className="video-container">
-            <video
-              ref={videoRef}
-              controls
-              className="w-full"
-              onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
-            />
+          <div className="video-container mx-auto" style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}>
+            <video ref={videoRef} controls className="w-full" onLoadedMetadata={handleLoadedMetadata} onTimeUpdate={handleTimeUpdate} />
             <canvas ref={canvasRef} className="w-full" />
           </div>
-          <input
-            type="range"
-            min="0"
-            max={videoRef.current?.duration || 0}
-            value={currentTime}
-            onChange={handleSeek}
-            className="seek-bar"
-          />
+          <input type="range" min="0" max={duration} value={currentTime} onChange={handleSeek} step="0.1" className="seek-bar block mx-auto my-2" />
+          <div className="zoom-controls">
+            <button onClick={() => setScale(s => Math.min(s + 0.5, 5))} className="bg-blue-500 rounded px-2 py-1">Zoom +</button>
+            <button onClick={() => setScale(s => Math.max(s - 0.5, 1))} className="bg-blue-500 rounded px-2 py-1">Zoom -</button>
+          </div>
           <div className="toolbar flex justify-around">
-            <button onClick={() => toggleTool('angle')}>Angle</button>
-            <button onClick={() => toggleTool('line')}>Line</button>
-            <button onClick={() => toggleTool('draw')}>Draw</button>
-            <button onClick={() => toggleTool('circle')}>Circle</button>
-            <button onClick={() => toggleTool('pose')}>Pose</button>
+            <button className={tool === 'angle' ? 'active' : ''} onClick={() => toggleTool('angle')}>Angle</button>
+            <button className={tool === 'line' ? 'active' : ''} onClick={() => toggleTool('line')}>Line</button>
+            <button className={tool === 'draw' ? 'active' : ''} onClick={() => toggleTool('draw')}>Draw</button>
+            <button className={tool === 'circle' ? 'active' : ''} onClick={() => toggleTool('circle')}>Circle</button>
+            <button className={tool === 'pose' ? 'active' : ''} onClick={() => { toggleTool('pose'); runPose(); }}>Pose</button>
           </div>
         </div>
       );
